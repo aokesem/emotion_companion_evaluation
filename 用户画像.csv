@@ -1,0 +1,97 @@
+﻿列名,含义,简单释义,互补列,后续利用,来源数据集
+died,是否已去世,0=健在；1=已去世,—,分析访谈/健康等内容时保留 died=0,Sample_Infor.dta
+crosssection,是否2020截面刷新样本（是否有全国推断权重）,0=否（无 Weights）；1=是（有 Weights，共17364人）,INDV_weight_ad2,与 Weights 表一一对应；全国推断分析保留 crosssection=1,Sample_Infor.dta
+INDV_weight_ad2,个体权重（含户与个人应答调整）,数值（代表权）,crosssection,与 crosssection=1 配套；加权比例=该人权重/有权重者权重之和；个人层面全国推断优先用此列,Weights.dta
+proxy_2,人口学模块是否代答,1=是；2=否,—,构建用户画像或对话样本时剔除代答（proxy_2=1）,Demographic_Background.dta
+proxy_5,健康模块是否代答,1=是；2=否,—,构建用户画像或对话样本时剔除代答（proxy_5=1）；与人口学 proxy_2 分别筛查,Health_Status_and_Functioning.dta
+ba001,访员记录性别,1=男；2=女,—,单独使用,Demographic_Background.dta
+xrage,年龄,数值（岁）,—,单独使用；作年龄协变量或分层,Demographic_Background.dta
+ba007,现居住地地址类型,1=家庭住房；2=养老院；3=医院；4=其他,—,为 ba006 跳题衍生：仅现居地≠访谈地址时询问；缺失多表示住访谈家庭，默认非养老院/医院；2 或 3 标为机构居住特征,Demographic_Background.dta
+ba008,城乡类型,1=城/镇中心；2=城乡结合部/镇乡；3=农村；4=特殊地区,—,单独使用,Demographic_Background.dta
+ba010,目前最高学历（不含成人教育）,1=未受教育；2=未读完小学；3=私塾；4=小学；5=初中；6=高中；7=职高；8=大专；9=本科；10=硕士；11=博士,zredu,与 zredu 互斥互补；生成 edu=ba010.fillna(zredu),Demographic_Background.dta
+zredu,教育程度（跨期整理）,1–11 档同 ba010,ba010,与 ba010 互斥互补；生成 edu=ba010.fillna(zredu),Demographic_Background.dta
+ba011,婚姻状况,1=已婚且配偶同住；2=已婚暂分居；3=分居；4=离婚；5=丧偶；6=未婚,—,单独使用,Demographic_Background.dta
+ba012,是否有人以配偶身份同住,1=是；2=否,—,跳题变量，非全样本有值,Demographic_Background.dta
+ba013,过去一年与配偶同住月数,0–12,—,跳题变量，主要对有配偶者有意义,Demographic_Background.dta
+ba018,上半年独自居住天数,0–182,—,单独使用,Demographic_Background.dta
+ba019,上半年仅与配偶同住天数,0–182,—,单独使用,Demographic_Background.dta
+ba020,上半年因不与别人同住而受影响程度,0–100,—,单独使用,Demographic_Background.dta
+dc026,生活满意度,1=非常满意；2=很满意；3=有点满意；4=不太满意；5=完全不满意,—,单独使用；分数越高满意度越低,Health_Status_and_Functioning.dta
+dc027,对子女满意度,1=非常满意；2=很满意；3=有点满意；4=不太满意；5=完全不满意；6=无子女,—,单独使用；6=无子女时不适用；分数越高满意度越低,Health_Status_and_Functioning.dta
+dc016,因小事烦恼（过去一周）,1=几乎没有（<1天）；2=少量（1–2天）；3=有时/中等（3–4天）；4=大多数时候（5–7天）；997=不知道；999=拒答,—,单独使用；为 CES-D 负向题，分数越高=烦恼越频繁,Health_Status_and_Functioning.dta
+dc018,感到抑郁（过去一周）,同上 1–4 频次编码；997=不知道；999=拒答,—,单独使用；为 CES-D 负向题，分数越高=抑郁情绪越频繁,Health_Status_and_Functioning.dta
+dc020,对未来抱有希望（过去一周）,同上 1–4 频次编码；997=不知道；999=拒答,—,单独使用；为 CES-D 正向题，分数越高=越常有希望；若计抑郁总分需反向计分,Health_Status_and_Functioning.dta
+dc024,感到孤独（过去一周）,同上 1–4 频次编码；997=不知道；999=拒答,—,单独使用；为 CES-D 负向题，分数越高=越孤独,Health_Status_and_Functioning.dta
+dc023,感到高兴（过去一周）,同上 1–4 频次编码；997=不知道；999=拒答,—,单独使用；为 CES-D 正向题，分数越高=越常高兴；若计抑郁总分需反向计分,Health_Status_and_Functioning.dta
+dc022,睡眠不安（过去一周）,同上 1–4 频次编码；997=不知道；999=拒答,—,单独使用；为 CES-D 负向题，分数越高=睡眠越差,Health_Status_and_Functioning.dta
+da001,自评健康状况,1=很好；2=好；3=一般；4=差；5=很差；997=不知道,—,单独使用,Health_Status_and_Functioning.dta
+da003_1_,医生诊断：高血压,1=是；2=否,—,单独使用；慢性病[1],Health_Status_and_Functioning.dta
+da003_2_,医生诊断：血脂异常,1=是；2=否,—,单独使用；慢性病[2],Health_Status_and_Functioning.dta
+da003_3_,医生诊断：糖尿病或高血糖,1=是；2=否,—,单独使用；慢性病[3],Health_Status_and_Functioning.dta
+da003_4_,医生诊断：癌症等恶性肿瘤,1=是；2=否,—,单独使用；慢性病[4],Health_Status_and_Functioning.dta
+da003_5_,医生诊断：慢性肺部疾病,1=是；2=否,—,单独使用；慢性病[5],Health_Status_and_Functioning.dta
+da003_6_,医生诊断：肝脏疾病,1=是；2=否,—,单独使用；慢性病[6],Health_Status_and_Functioning.dta
+da003_7_,医生诊断：心脏病,1=是；2=否,—,单独使用；慢性病[7],Health_Status_and_Functioning.dta
+da003_8_,医生诊断：中风,1=是；2=否,—,单独使用；慢性病[8],Health_Status_and_Functioning.dta
+da003_9_,医生诊断：肾脏疾病,1=是；2=否,—,单独使用；慢性病[9],Health_Status_and_Functioning.dta
+da003_10_,医生诊断：胃部或其他消化系统疾病,1=是；2=否,—,单独使用；慢性病[10],Health_Status_and_Functioning.dta
+da003_11_,医生诊断：情绪/神经/精神类问题,1=是；2=否,—,单独使用；慢性病[11],Health_Status_and_Functioning.dta
+da003_12_,医生诊断：关节炎或风湿病,1=是；2=否,—,单独使用；慢性病[12],Health_Status_and_Functioning.dta
+da003_13_,医生诊断：哮喘,1=是；2=否,—,单独使用；慢性病[13],Health_Status_and_Functioning.dta
+da003_14_,医生诊断：记忆相关疾病,1=是；2=否,—,单独使用；慢性病[14],Health_Status_and_Functioning.dta
+da003_15_,医生诊断：白内障或其他视力问题,1=是；2=否,—,单独使用；慢性病[15],Health_Status_and_Functioning.dta
+da027,身体疼痛程度,1=无；2=一点；3=有些；4=相当；5=非常,—,单独使用,Health_Status_and_Functioning.dta
+da030,上月平均每天实际睡眠小时数,数值（小时）,—,单独使用,Health_Status_and_Functioning.dta
+da032_1_,是否高强度体力活动（每次>10分钟）,1=是；2=否,—,单独使用,Health_Status_and_Functioning.dta
+da032_2_,是否中等强度体力活动（每次>10分钟）,1=是；2=否,—,单独使用,Health_Status_and_Functioning.dta
+da032_3_,是否轻度体力活动（每次>10分钟）,1=是；2=否,—,单独使用,Health_Status_and_Functioning.dta
+da037_1_,高强度活动目的,1=工作需要；2=娱乐；3=锻炼；4=其他,—,单独使用；仅 da032_1_=是 时有意义,Health_Status_and_Functioning.dta
+da037_2_,中等强度活动目的,1=工作需要；2=娱乐；3=锻炼；4=其他,—,单独使用；仅 da032_2_=是 时有意义,Health_Status_and_Functioning.dta
+da037_3_,轻度活动目的,1=工作需要；2=娱乐；3=锻炼；4=其他,—,单独使用；仅 da032_3_=是 时有意义,Health_Status_and_Functioning.dta
+da038_s1,上月是否与朋友交往,0=否；1=是,—,单独使用；多选,Health_Status_and_Functioning.dta
+da038_s2,上月是否打麻将/下棋/打牌/去社区活动室,0=否；2=是,—,单独使用；多选,Health_Status_and_Functioning.dta
+da038_s3,上月是否帮助不住一起的家人朋友邻居,0=否；3=是,—,单独使用；多选,Health_Status_and_Functioning.dta
+da038_s4,上月是否参加运动/社交等俱乐部,0=否；4=是,—,单独使用；多选,Health_Status_and_Functioning.dta
+da038_s5,上月是否参加社区相关组织,0=否；5=是,—,单独使用；多选,Health_Status_and_Functioning.dta
+da038_s6,上月是否做志愿/慈善或照顾不住一起的病弱者,0=否；6=是,—,单独使用；多选,Health_Status_and_Functioning.dta
+da038_s7,上月是否参加教育/培训课程,0=否；7=是,—,单独使用；多选,Health_Status_and_Functioning.dta
+da038_s8,上月是否其他活动,0=否；8=是,—,单独使用；多选,Health_Status_and_Functioning.dta
+da038_s9,上月是否以上都没有,0=否；9=是,—,单独使用；多选,Health_Status_and_Functioning.dta
+da039_1_,活动[1]频率（对应与朋友交往）,1=几乎每天；2=几乎每周；3=不规律,—,单独使用；仅选了对应 da038 项时有值,Health_Status_and_Functioning.dta
+da039_2_,活动[2]频率（对应麻将棋牌等）,1=几乎每天；2=几乎每周；3=不规律,—,单独使用,Health_Status_and_Functioning.dta
+da039_3_,活动[3]频率（对应帮助他人）,1=几乎每天；2=几乎每周；3=不规律,—,单独使用,Health_Status_and_Functioning.dta
+da039_4_,活动[4]频率（对应俱乐部）,1=几乎每天；2=几乎每周；3=不规律,—,单独使用,Health_Status_and_Functioning.dta
+da039_5_,活动[5]频率（对应社区组织）,1=几乎每天；2=几乎每周；3=不规律,—,单独使用,Health_Status_and_Functioning.dta
+da039_6_,活动[6]频率（对应志愿/照顾他人）,1=几乎每天；2=几乎每周；3=不规律,—,单独使用,Health_Status_and_Functioning.dta
+da039_7_,活动[7]频率（对应教育培训）,1=几乎每天；2=几乎每周；3=不规律,—,单独使用,Health_Status_and_Functioning.dta
+da039_8_,活动[8]频率（对应其他活动）,1=几乎每天；2=几乎每周；3=不规律,—,单独使用,Health_Status_and_Functioning.dta
+da040,是否使用互联网,1=是；2=否,—,单独使用,Health_Status_and_Functioning.dta
+da041_s1,上网设备：台式电脑,0=否；1=是,—,单独使用；多选,Health_Status_and_Functioning.dta
+da041_s2,上网设备：笔记本,0=否；2=是,—,单独使用；多选,Health_Status_and_Functioning.dta
+da041_s3,上网设备：平板,0=否；3=是,—,单独使用；多选,Health_Status_and_Functioning.dta
+da041_s4,上网设备：手机,0=否；4=是,—,单独使用；多选,Health_Status_and_Functioning.dta
+da041_s5,上网设备：其他,0=否；5=是,—,单独使用；多选,Health_Status_and_Functioning.dta
+da042_s1,上网用途：聊天,0=否；1=是,—,单独使用；多选,Health_Status_and_Functioning.dta
+da042_s2,上网用途：看新闻,0=否；2=是,—,单独使用；多选,Health_Status_and_Functioning.dta
+da042_s3,上网用途：看视频,0=否；3=是,—,单独使用；多选,Health_Status_and_Functioning.dta
+da042_s4,上网用途：玩游戏,0=否；4=是,—,单独使用；多选,Health_Status_and_Functioning.dta
+da042_s5,上网用途：理财,0=否；5=是,—,单独使用；多选,Health_Status_and_Functioning.dta
+da042_s6,上网用途：其他,0=否；6=是,—,单独使用；多选,Health_Status_and_Functioning.dta
+da043,是否用手机支付,1=是；2=否,—,单独使用,Health_Status_and_Functioning.dta
+da044,是否使用微信,1=是；2=否,—,单独使用,Health_Status_and_Functioning.dta
+da045,是否使用微信朋友圈,1=是；2=否,—,单独使用,Health_Status_and_Functioning.dta
+db043,是否因健康/残疾不能工作,1=完全不能工作；2=不能长时间工作；3=没问题,—,单独使用,Health_Status_and_Functioning.dta
+db044,是否因健康/残疾不能做家事,1=完全不能；2=不能长时间做；3=没问题,—,单独使用,Health_Status_and_Functioning.dta
+db045,多久接受他人帮助,1=从不；2=偶尔；3=大多时候；4=本节由代答完成,—,单独使用；4 与 proxy_5 信息重叠,Health_Status_and_Functioning.dta
+xchildnum,子女总数,数值 0–10,xchildalivenum,经 householdID 合并；画像默认最多描述 2 个子女（老大/老二）,Family_Information.dta
+xchildalivenum,访视时健在子女数,数值 0–10,xchildnum,经 householdID 合并；xchildnum≥i 时 ca005_i_–ca010_i_ 才有意义,Family_Information.dta
+ca005_1_,第1子女出生年,年份（数值）,xchildnum,仅 xchildnum≥1 时用；第1子女=老大,Family_Information.dta
+ca005_2_,第2子女出生年,年份（数值）,xchildnum,仅 xchildnum≥2 时用；第2子女=老二,Family_Information.dta
+ca006_1_,第1子女性别,1=男；2=女,xchildnum,仅 xchildnum≥1 时用,Family_Information.dta
+ca006_2_,第2子女性别,1=男；2=女,xchildnum,仅 xchildnum≥2 时用,Family_Information.dta
+ca007_1_,第1子女最高学历,1=未受教育；2=未读完小学；3=私塾；4=小学；5=初中；6=高中；7=职高；8=大专；9=本科；10=硕士；11=博士；997=不知道；999=拒答,xchildnum,仅 xchildnum≥1 时用；编码档同 ba010,Family_Information.dta
+ca007_2_,第2子女最高学历,同上 1–11；997；999,xchildnum,仅 xchildnum≥2 时用,Family_Information.dta
+ca008_1_,第1子女是否工作/上学,1=工作；2=上学；3=边工边读；4=都不；997=不知道；999=拒答,xchildnum,仅 xchildnum≥1 时用,Family_Information.dta
+ca008_2_,第2子女是否工作/上学,同上 1–4；997；999,xchildnum,仅 xchildnum≥2 时用,Family_Information.dta
+ca010_1_,第1子女婚姻状况,1=已婚且配偶同住；2=已婚暂分居；3=分居；4=离婚；5=丧偶；6=未婚；997=不知道；999=拒答,xchildnum,仅 xchildnum≥1 时用,Family_Information.dta
+ca010_2_,第2子女婚姻状况,同上 1–6；997；999,xchildnum,仅 xchildnum≥2 时用,Family_Information.dta
