@@ -95,3 +95,16 @@ ca008_1_,第1子女是否工作/上学,1=工作；2=上学；3=边工边读；4=
 ca008_2_,第2子女是否工作/上学,同上 1–4；997；999,xchildnum,仅 xchildnum≥2 时用,Family_Information.dta
 ca010_1_,第1子女婚姻状况,1=已婚且配偶同住；2=已婚暂分居；3=分居；4=离婚；5=丧偶；6=未婚；997=不知道；999=拒答,xchildnum,仅 xchildnum≥1 时用,Family_Information.dta
 ca010_2_,第2子女婚姻状况,同上 1–6；997；999,xchildnum,仅 xchildnum≥2 时用,Family_Information.dta
+ca014_1_,过去一年与第1子女同住月数,0–12（月）,xchildnum,仅 xchildnum≥1 时用；与 dc027、ca015/ca016 配套,Family_Information.dta
+ca014_2_,过去一年与第2子女同住月数,0–12（月）,xchildnum,仅 xchildnum≥2 时用,Family_Information.dta
+ca015_1_,与第1子女见面频率,1=几乎每天；2=每周2–3次；3=每周1次；4=每两周；5=每月；6=每三月；7=每半年；8=每年；9=几乎不见；10=其他,xchildnum,仅 xchildnum≥1 时用,Family_Information.dta
+ca015_2_,与第2子女见面频率,同上 1–10,xchildnum,仅 xchildnum≥2 时用,Family_Information.dta
+ca016_1_,与第1子女电话/短信/微信联系频率,同上 1–10（编码同 ca015）,xchildnum,仅 xchildnum≥1 时用,Family_Information.dta
+ca016_2_,与第2子女电话/短信/微信联系频率,同上 1–10,xchildnum,仅 xchildnum≥2 时用,Family_Information.dta
+fa001,是否从事农业/家庭农活,1=有；2=无,fa004,经 ID 合并；指种植养殖等农业生产（非养花种草消遣）；可与非农工作并存；农村人设「务农」的粗指标,Work_Retirement.dta
+fh001,是否已办理退休,1=是；2=否,fh003_1,经 ID 合并；仅 fh001=1 时有退休年月,Work_Retirement.dta
+fh003_1,退休年份,年份（数值）,fh003_2,仅 fh001=1；与 fh003_2 组成退休时间,Work_Retirement.dta
+fh003_2,退休月份,1–12,fh003_1,仅 fh001=1,Work_Retirement.dta
+xworking,是否在工作（派生）,0=否；1=是,fa001;fa004,经 ID 合并；与 fa001/fa004 可对照，画像中可优先用问卷项或本列其一,Work_Retirement.dta
+ff001,过去一年总工作天数,数值 0–366（天）,xworking,经 ID 合并；各类工作合计，比 xmainjobdays 更宽；衡量工作强度,Work_Retirement.dta
+ff003,上月是否在找工作,1=是；2=否,xworking,经 ID 合并；仍在求职者,Work_Retirement.dta
