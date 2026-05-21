@@ -6,7 +6,7 @@
 import pandas as pd
 
 # 按你的实际路径修改
-path = r"d:\代码_精神慰藉agent评估\CHARLS2020r\Sample_Infor.dta"
+path = r"d:\代码_精神慰藉agent评估\CHARLS2020r 用户画像数据\Family_information.dta"
 
 df = pd.read_stata(path)
 

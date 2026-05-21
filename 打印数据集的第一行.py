@@ -5,7 +5,7 @@
 
 import pandas as pd
 
-path = r"d:\代码_精神慰藉agent评估\CHARLS2020r\Weights.dta"
+path = r"d:\代码_精神慰藉agent评估\CHARLS2020r 用户画像数据\用户画像_合并.dta"
 
 df = pd.read_stata(path)
 
