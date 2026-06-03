@@ -35,7 +35,7 @@ OPENAI_API_KEY=your-api-key
 
 ## 3. 运行
 默认读取：
-`用户画像数据/用户画像_抽样1000_事实文本.csv`
+`用户画像数据/用户画像_抽样500_事实文本.csv`
 
 ```powershell
 python .\数据生成代码\generate_sim_user_pipeline.py --model deepseek-v4-pro --continue-on-error
@@ -49,6 +49,8 @@ python .\数据生成代码\generate_sim_user_pipeline.py --model deepseek-v4-pr
 - `--temperature 0.2`：控制生成稳定性
 - `--max-tokens 1200`：每步输出上限
 
+说明：如果输入文件中同一个 `ID` 出现多次，脚本只处理第一次出现的记录，后续重复 `ID` 会直接跳过。
+
 示例：
 
 ```powershell
@@ -59,9 +61,9 @@ python .\数据生成代码\generate_sim_user_pipeline.py --model deepseek-v4-pr
 ## 5. 输出文件
 在 `用户画像数据/` 下生成：
 
-- `模拟用户信息_1000.jsonl`：逐条完整结构
-- `模拟用户信息_1000.csv`：扁平化汇总
-- `模拟用户信息_1000_errors.jsonl`：失败记录
+- `模拟用户信息_500.jsonl`：逐条完整结构
+- `模拟用户信息_500.csv`：扁平化汇总
+- `模拟用户信息_500_errors.jsonl`：失败记录
 
 ## 6. 四步串行逻辑
 

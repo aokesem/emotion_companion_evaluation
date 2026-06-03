@@ -41,7 +41,7 @@ def load_config(config_path: Path) -> dict[str, Any]:
 def parse_args() -> argparse.Namespace:
     config = load_config(CONFIG_PATH)
     defaults = config["model_defaults"]
-    default_input = Path(__file__).resolve().parent.parent / "用户画像数据" / "用户画像_抽样1000_事实文本.csv"
+    default_input = Path(__file__).resolve().parent.parent / "用户画像数据" / "用户画像_抽样500_事实文本.csv"
     default_out_dir = Path(__file__).resolve().parent.parent / "用户画像数据"
 
     parser = argparse.ArgumentParser(description="生成模拟用户信息（4步串行）")
@@ -195,6 +195,11 @@ def build_step1_prompt(config: dict[str, Any], row: pd.Series) -> str:
     data = {
         "基础信息文本": row_text(row, "基础信息文本"),
         "教育信息文本": row_text(row, "教育信息文本"),
+        "婚姻信息文本": row_text(row, "婚姻信息文本"),
+        "情绪信息文本": row_text(row, "情绪信息文本"),
+        "活动信息文本": row_text(row, "活动信息文本"),
+        "上网信息文本": row_text(row, "上网信息文本"),
+        "工作信息文本": row_text(row, "工作信息文本"),
     }
     return render_step_prompt(config, "step1", data)
 
@@ -304,9 +309,9 @@ def run(args: argparse.Namespace) -> None:
         raise FileNotFoundError(f"输入文件不存在: {args.input_csv}")
 
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    out_jsonl = args.output_dir / "模拟用户信息_1000.jsonl"
-    out_csv = args.output_dir / "模拟用户信息_1000.csv"
-    out_error = args.output_dir / "模拟用户信息_1000_errors.jsonl"
+    out_jsonl = args.output_dir / "模拟用户信息_500.jsonl"
+    out_csv = args.output_dir / "模拟用户信息_500.csv"
+    out_error = args.output_dir / "模拟用户信息_500_errors.jsonl"
 
     df = pd.read_csv(args.input_csv, encoding="utf-8-sig")
     total = len(df)
@@ -314,6 +319,7 @@ def run(args: argparse.Namespace) -> None:
     df = df.iloc[args.start:end].copy()
 
     processed_ids = load_processed_ids(out_jsonl) if args.resume else set()
+    seen_input_ids: set[str] = set()
     client = OpenAICompatClient(args.base_url, args.api_key, args.timeout, args.retries, args.debug_http)
 
     print(f"输入: {args.input_csv}")
@@ -323,13 +329,20 @@ def run(args: argparse.Namespace) -> None:
     print(f"模型: {args.model}")
 
     done_count = 0
-    skip_count = 0
+    resume_skip_count = 0
+    duplicate_skip_count = 0
     err_count = 0
 
     for idx, row in df.iterrows():
         row_id = str(row.get("ID", ""))
+        if row_id in seen_input_ids:
+            duplicate_skip_count += 1
+            print(f"[SKIP-DUP] idx={idx} ID={row_id}")
+            continue
+        seen_input_ids.add(row_id)
+
         if args.resume and row_id in processed_ids:
-            skip_count += 1
+            resume_skip_count += 1
             continue
 
         try:
@@ -412,7 +425,8 @@ def run(args: argparse.Namespace) -> None:
 
     print("\n完成。")
     print(f"新增成功: {done_count}")
-    print(f"跳过(续跑): {skip_count}")
+    print(f"跳过(续跑): {resume_skip_count}")
+    print(f"跳过(重复ID): {duplicate_skip_count}")
     print(f"错误: {err_count}")
 
 

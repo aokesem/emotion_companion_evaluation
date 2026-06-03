@@ -8,10 +8,10 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT / "用户画像数据"
-SAMPLE_PATH = DATA_DIR / "用户画像_抽样1000.csv"
+SAMPLE_PATH = DATA_DIR / "用户画像_抽样500.csv"
 CATALOG_PATH = DATA_DIR / "用户画像.csv"
 GROUP_PATH = DATA_DIR / "用户画像信息分组.csv"
-OUT_PATH = DATA_DIR / "用户画像_抽样1000_事实文本.csv"
+OUT_PATH = DATA_DIR / "用户画像_抽样500_事实文本.csv"
 
 MISSING_CODES = {97, 98, 99, 997, 998, 999}
 

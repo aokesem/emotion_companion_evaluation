@@ -8,3 +8,4 @@
 {"index": 2, "ID": "51606221001", "error": "模型调用失败: HTTP 503: {\"error\":{\"message\":\"No available channel for model gpt-5.2 under group OpenAI | CodeX专用 (distributor) (request id: 202606020202008762670008268d9d6jTVrPS5W)\",\"type\":\"new_api_error\",\"param\":\"\",\"code\":\"model_not_found\"}}"}
 {"index": 3, "ID": "211154331001", "error": "模型调用失败: Expecting value: line 1 column 1 (char 0)"}
 {"index": 2, "ID": "51606221001", "error": "模型调用失败: 模型返回非 JSON 对象: "}
+{"index": 4, "ID": "134902319002", "error": "模型调用失败: 模型返回非 JSON 对象: {\n  \"成长背景\": \"他生在城镇普通家庭，兄弟姐妹多，初中毕业就进工厂当学徒，早早担起养家责任。生活虽不富裕，但养成了吃苦耐劳、实实在在过日子的性子。\",\n  \"职业轨迹\": \"年轻时在镇上干泥瓦工，后来一直做装修零活，手艺靠经验磨出来。六十一岁还没退休，有活就接，一年干三百多天，闲不住，习惯了自己挣自己花的日子。\",\n  \"健康影响\": \"有慢性支气管炎，天"}
