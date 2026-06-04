@@ -57,7 +57,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--sleep", type=float, default=defaults["sleep"], help="每条记录间隔秒数")
     parser.add_argument("--start", type=int, default=0, help="起始行索引（0-based）")
     parser.add_argument("--limit", type=int, default=5, help="处理条数，0 表示全部")
-    parser.add_argument("--resume", action="store_true", help="断点续跑：跳过已写入 JSONL 的 ID")
+    parser.add_argument("--resume", action="store_true", help="兼容旧参数：默认已跳过已写入 JSONL 的 ID")
+    parser.add_argument("--regenerate-existing", action="store_true", help="不跳过已写入 JSONL 的 ID，强制重新生成")
     parser.add_argument("--continue-on-error", action="store_true", help="遇错后继续下一条")
     parser.add_argument("--debug-http", action="store_true", help="输出接口响应诊断信息")
     return parser.parse_args()
@@ -211,6 +212,10 @@ def build_step2_prompt(config: dict[str, Any], row: pd.Series, step1: dict[str, 
         "婚姻信息文本": row_text(row, "婚姻信息文本"),
         "健康信息文本": row_text(row, "健康信息文本"),
         "工作信息文本": row_text(row, "工作信息文本"),
+        "情绪信息文本": row_text(row, "情绪信息文本"),
+        "活动信息文本": row_text(row, "活动信息文本"),
+        "子女信息文本": row_text(row, "子女信息文本"),
+        "上网信息文本": row_text(row, "上网信息文本"),
         "用户性格": step1,
     }
     return render_step_prompt(config, "step2", data)
@@ -284,6 +289,7 @@ def flatten_record(record: dict[str, Any]) -> dict[str, Any]:
         "家庭联系状态": step2.get("家庭联系状态", ""),
         "当前核心需求": step2.get("当前核心需求", ""),
         "主要烦恼": step3.get("主要烦恼", ""),
+        "烦恼类别": step3.get("烦恼类别", ""),
         "表层话题": step3.get("表层话题", ""),
         "深层成因": step3.get("深层成因", step3.get("深层话题", "")),
         "情绪底色": step4.get("情绪底色", step4.get("情绪状态", "")),
@@ -318,7 +324,7 @@ def run(args: argparse.Namespace) -> None:
     end = total if args.limit <= 0 else min(total, args.start + args.limit)
     df = df.iloc[args.start:end].copy()
 
-    processed_ids = load_processed_ids(out_jsonl) if args.resume else set()
+    processed_ids = set() if args.regenerate_existing else load_processed_ids(out_jsonl)
     seen_input_ids: set[str] = set()
     client = OpenAICompatClient(args.base_url, args.api_key, args.timeout, args.retries, args.debug_http)
 
@@ -329,7 +335,7 @@ def run(args: argparse.Namespace) -> None:
     print(f"模型: {args.model}")
 
     done_count = 0
-    resume_skip_count = 0
+    existing_skip_count = 0
     duplicate_skip_count = 0
     err_count = 0
 
@@ -341,8 +347,9 @@ def run(args: argparse.Namespace) -> None:
             continue
         seen_input_ids.add(row_id)
 
-        if args.resume and row_id in processed_ids:
-            resume_skip_count += 1
+        if row_id in processed_ids:
+            existing_skip_count += 1
+            print(f"[SKIP-EXIST] idx={idx} ID={row_id}")
             continue
 
         try:
@@ -391,6 +398,7 @@ def run(args: argparse.Namespace) -> None:
                 "对话锚点": s4,
             }
             save_jsonl_row(out_jsonl, record)
+            processed_ids.add(row_id)
             done_count += 1
             print(f"[OK] idx={idx} ID={row_id}")
 
@@ -425,7 +433,7 @@ def run(args: argparse.Namespace) -> None:
 
     print("\n完成。")
     print(f"新增成功: {done_count}")
-    print(f"跳过(续跑): {resume_skip_count}")
+    print(f"跳过(已有输出): {existing_skip_count}")
     print(f"跳过(重复ID): {duplicate_skip_count}")
     print(f"错误: {err_count}")
 

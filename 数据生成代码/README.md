@@ -44,18 +44,21 @@ python .\数据生成代码\generate_sim_user_pipeline.py --model deepseek-v4-pr
 ## 4. 常用参数
 
 - `--start 0 --limit 20`：先跑前 20 条做抽查
-- `--resume`：断点续跑（按已写入 JSONL 的 ID 跳过）
+- 默认会按已写入 JSONL 的 `ID` 跳过已有输出，避免重复生成同一用户
+- `--regenerate-existing`：不跳过已有输出，强制重新生成
+- `--resume`：兼容旧参数；当前默认已经跳过已有输出
 - `--sleep 0.2`：每条之间间隔，降低速率
-- `--temperature 0.2`：控制生成稳定性
+- `--temperature 0.4`：控制生成稳定性和多样性
 - `--max-tokens 1200`：每步输出上限
 
-说明：如果输入文件中同一个 `ID` 出现多次，脚本只处理第一次出现的记录，后续重复 `ID` 会直接跳过。
+说明：如果输入文件中同一个 `ID` 出现多次，脚本只处理第一次出现的记录，后续重复 `ID` 会直接跳过；如果输出 JSONL 中已经存在某个 `ID`，默认也会跳过。
 
 示例：
 
 ```powershell
 python .\数据生成代码\generate_sim_user_pipeline.py --model deepseek-v4-pro --start 0 --limit 20 --continue-on-error
-python .\数据生成代码\generate_sim_user_pipeline.py --model deepseek-v4-pro --resume --continue-on-error
+python .\数据生成代码\generate_sim_user_pipeline.py --model deepseek-v4-pro --continue-on-error
+python .\数据生成代码\generate_sim_user_pipeline.py --model deepseek-v4-pro --regenerate-existing --start 0 --limit 5 --continue-on-error
 ```
 
 ## 5. 输出文件
@@ -69,7 +72,7 @@ python .\数据生成代码\generate_sim_user_pipeline.py --model deepseek-v4-pr
 
 1. 用户性格（性格偏好、对话风格偏好）
 2. 个人经历（6项）
-3. 生活烦恼（主要烦恼、表层话题、深层话题）
+3. 生活烦恼（主要烦恼、烦恼类别、表层话题、深层成因）
 4. 对话锚点（情绪状态、触发事件、开场方式、开场首句示例）
 
 每一步都会引用上一步结果，符合你定义的依赖链。
