@@ -1,0 +1,27 @@
+{
+  "defaults": {
+    "turns": 10,
+    "start": 0,
+    "limit": 1,
+    "timeout": 90,
+    "retries": 3,
+    "sleep": 0.0,
+    "temperature": 0.4,
+    "max_tokens": 800,
+    "simulated_user_model": "deepseek-v4-pro",
+    "tested_agent_model": "deepseek-v4-pro",
+    "evaluator_model": "deepseek-v4-pro"
+  },
+  "paths": {
+    "fact_csv": "../用户画像数据/用户画像_抽样500_事实文本.csv",
+    "sim_user_jsonl": "../用户画像数据/模拟用户信息_500.jsonl",
+    "success_jsonl": "outputs/dialog_eval_runs.jsonl",
+    "summary_csv": "outputs/dialog_eval_summary.csv",
+    "error_jsonl": "outputs/dialog_eval_errors.jsonl",
+    "simulated_user_dialog_prompt": "prompts/simulated_user_dialog.txt",
+    "tested_agent_dialog_prompt": "prompts/tested_agent_dialog.txt",
+    "simulated_user_rating_prompt": "prompts/simulated_user_rating.txt",
+    "tested_agent_summary_prompt": "prompts/tested_agent_summary.txt",
+    "evaluator_rating_prompt": "prompts/evaluator_rating.txt"
+  }
+}

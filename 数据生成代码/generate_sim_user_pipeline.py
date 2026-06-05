@@ -56,7 +56,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--retries", type=int, default=defaults["retries"], help="失败重试次数")
     parser.add_argument("--sleep", type=float, default=defaults["sleep"], help="每条记录间隔秒数")
     parser.add_argument("--start", type=int, default=0, help="起始行索引（0-based）")
-    parser.add_argument("--limit", type=int, default=5, help="处理条数，0 表示全部")
+    parser.add_argument("--limit", type=int, default=50, help="处理条数，0 表示全部")
     parser.add_argument("--resume", action="store_true", help="兼容旧参数：默认已跳过已写入 JSONL 的 ID")
     parser.add_argument("--regenerate-existing", action="store_true", help="不跳过已写入 JSONL 的 ID，强制重新生成")
     parser.add_argument("--continue-on-error", action="store_true", help="遇错后继续下一条")
