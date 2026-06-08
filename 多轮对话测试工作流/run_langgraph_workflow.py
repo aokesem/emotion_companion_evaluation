@@ -24,6 +24,7 @@ CONFIG_PATH = ROOT / "workflow_config.json"
 class WorkflowState(TypedDict, total=False):
     run_id: str
     created_at: str
+    ID: str
     case_id: str
     sample_pick_order: int
     turn: int
@@ -84,8 +85,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--simulated-user-model", type=str, default=defaults["simulated_user_model"], help="模拟用户模型名")
     parser.add_argument("--tested-agent-model", type=str, default=defaults["tested_agent_model"], help="被测 AI 模型名")
     parser.add_argument("--evaluator-model", type=str, default=defaults["evaluator_model"], help="评估 AI 模型名")
-    parser.add_argument("--base-url", type=str, default=os.getenv("OPENAI_BASE_URL", ""), help="API Base URL")
-    parser.add_argument("--api-key", type=str, default=os.getenv("OPENAI_API_KEY", ""), help="API Key")
+    parser.add_argument("--base-url", type=str, default=os.getenv("OPENAI_BASE_URL", ""), help="通用 API Base URL，未设置角色专用 URL 时使用")
+    parser.add_argument("--api-key", type=str, default=os.getenv("OPENAI_API_KEY", ""), help="通用 API Key，未设置角色专用 Key 时使用")
+    parser.add_argument("--simulated-user-base-url", type=str, default=os.getenv("SIMULATED_USER_BASE_URL", ""), help="模拟用户 API Base URL")
+    parser.add_argument("--simulated-user-api-key", type=str, default=os.getenv("SIMULATED_USER_API_KEY", ""), help="模拟用户 API Key")
+    parser.add_argument("--tested-agent-base-url", type=str, default=os.getenv("TESTED_AGENT_BASE_URL", ""), help="被测 AI API Base URL")
+    parser.add_argument("--tested-agent-api-key", type=str, default=os.getenv("TESTED_AGENT_API_KEY", ""), help="被测 AI API Key")
+    parser.add_argument("--evaluator-base-url", type=str, default=os.getenv("EVALUATOR_BASE_URL", ""), help="评估 AI API Base URL")
+    parser.add_argument("--evaluator-api-key", type=str, default=os.getenv("EVALUATOR_API_KEY", ""), help="评估 AI API Key")
     parser.add_argument("--temperature", type=float, default=defaults["temperature"], help="采样温度")
     parser.add_argument("--max-tokens", type=int, default=defaults["max_tokens"], help="每次回复最大 token")
     parser.add_argument("--timeout", type=int, default=defaults["timeout"], help="请求超时秒数")
@@ -93,6 +100,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--sleep", type=float, default=defaults["sleep"], help="每个样本之间间隔秒数")
     parser.add_argument("--continue-on-error", action="store_true", help="遇错后继续下一个样本")
     parser.add_argument("--dry-run", action="store_true", help="只检查数据和配置，不调用模型")
+    parser.add_argument("--print-dialog", action="store_true", help="运行时实时打印用户 AI 与被测 AI 的对话内容")
     parser.add_argument("--regenerate-existing", action="store_true", help="不跳过已成功记录的 ID")
     parser.add_argument("--debug-http", action="store_true", help="输出接口响应诊断信息")
     return parser.parse_args()
@@ -184,7 +192,9 @@ class OpenAICompatClient:
 class WorkflowContext:
     args: argparse.Namespace
     prompt_paths: dict[str, Path]
-    client: OpenAICompatClient | None
+    simulated_user_client: OpenAICompatClient | None
+    tested_agent_client: OpenAICompatClient | None
+    evaluator_client: OpenAICompatClient | None
 
     def prompt(self, name: str, **kwargs: str) -> str:
         path = self.prompt_paths[name]
@@ -223,10 +233,14 @@ def load_success_ids(path: Path) -> set[str]:
                 obj = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            row_id = str(obj.get("ID", "")).lstrip("0")
+            row_id = str(obj.get("ID") or obj.get("case_id") or "").lstrip("0")
             if row_id:
                 ids.add(row_id)
     return ids
+
+
+def normalized_id(value: object) -> str:
+    return str(value).strip().lstrip("0")
 
 
 def row_text(row: pd.Series, col: str) -> str:
@@ -236,12 +250,32 @@ def row_text(row: pd.Series, col: str) -> str:
     return str(value).strip()
 
 
-def select_fact_rows(df: pd.DataFrame, ids: str, start: int, limit: int) -> pd.DataFrame:
+def select_fact_rows(
+    df: pd.DataFrame,
+    ids: str,
+    start: int,
+    limit: int,
+    success_ids: set[str],
+    sim_records: dict[str, dict[str, Any]],
+    allow_existing: bool,
+) -> pd.DataFrame:
     if ids.strip():
         wanted = {part.strip().lstrip("0") for part in ids.split(",") if part.strip()}
         return df[df["ID"].astype(str).str.lstrip("0").isin(wanted)].copy()
-    end = len(df) if limit <= 0 else min(len(df), start + limit)
-    return df.iloc[start:end].copy()
+
+    rows: list[pd.Series] = []
+    for _, row in df.iloc[start:].iterrows():
+        row_id = normalized_id(row.get("ID", ""))
+        if not row_id:
+            continue
+        if (not allow_existing) and row_id in success_ids:
+            continue
+        if row_id not in sim_records:
+            continue
+        rows.append(row)
+        if limit > 0 and len(rows) >= limit:
+            break
+    return pd.DataFrame(rows, columns=df.columns)
 
 
 def get_opening_sentence(sim_info: dict[str, Any]) -> str:
@@ -268,6 +302,11 @@ def save_jsonl(path: Path, obj: dict[str, Any]) -> None:
         f.write("\n")
 
 
+def print_dialog_line(case_id: str, round_no: int, speaker: str, content: str) -> None:
+    print(f"\n[{case_id}][第 {round_no} 轮][{speaker}]")
+    print(content.strip())
+
+
 def append_summary_csv(path: Path, state: WorkflowState) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     exists = path.exists()
@@ -288,25 +327,28 @@ def append_summary_csv(path: Path, state: WorkflowState) -> None:
 
 
 def build_graph(ctx: WorkflowContext):
-    if ctx.client is None:
+    if ctx.simulated_user_client is None or ctx.tested_agent_client is None or ctx.evaluator_client is None:
         raise ValueError("dry-run 模式不需要构建可执行 graph")
-    client = ctx.client
+    simulated_user_client = ctx.simulated_user_client
+    tested_agent_client = ctx.tested_agent_client
+    evaluator_client = ctx.evaluator_client
     args = ctx.args
 
     def user_opening(state: WorkflowState) -> WorkflowState:
         sim_info = state["sim_user_info"]
-        user_profile = state["user_profile"]
         opening = get_opening_sentence(sim_info)
         if not opening:
             raise ValueError(f"ID={state['case_id']} 缺少开场首句")
 
         sim_system = ctx.prompt(
             "simulated_user_dialog",
-            user_profile=user_profile,
             sim_user_info_json=json.dumps(sim_info, ensure_ascii=False, indent=2),
             opening_sentence=opening,
         )
-        tested_system = ctx.prompt("tested_agent_dialog", user_profile=user_profile)
+        tested_system = ctx.prompt("tested_agent_dialog")
+
+        if args.print_dialog:
+            print_dialog_line(state["case_id"], 1, "用户AI", opening)
 
         return {
             "turn": 1,
@@ -322,13 +364,15 @@ def build_graph(ctx: WorkflowContext):
         }
 
     def tested_agent_reply(state: WorkflowState) -> WorkflowState:
-        reply = client.chat_text(
+        reply = tested_agent_client.chat_text(
             model=args.tested_agent_model,
             messages=state["tested_agent_messages"],
             temperature=args.temperature,
             max_tokens=args.max_tokens,
         )
         turn = state["turn"]
+        if args.print_dialog:
+            print_dialog_line(state["case_id"], turn, "被测AI", reply)
         return {
             "dialog_messages": state["dialog_messages"]
             + [{"round": turn, "speaker": "tested_agent", "content": reply}],
@@ -340,13 +384,15 @@ def build_graph(ctx: WorkflowContext):
         return "finish_dialog" if state["turn"] >= state["max_turns"] else "continue_dialog"
 
     def simulated_user_reply(state: WorkflowState) -> WorkflowState:
-        reply = client.chat_text(
+        reply = simulated_user_client.chat_text(
             model=args.simulated_user_model,
             messages=state["simulated_user_messages"],
             temperature=args.temperature,
             max_tokens=args.max_tokens,
         )
         next_turn = state["turn"] + 1
+        if args.print_dialog:
+            print_dialog_line(state["case_id"], next_turn, "用户AI", reply)
         return {
             "turn": next_turn,
             "dialog_messages": state["dialog_messages"]
@@ -361,7 +407,7 @@ def build_graph(ctx: WorkflowContext):
             dialog_transcript=transcript_text(state["dialog_messages"]),
             dialog_messages_json=json.dumps(state["dialog_messages"], ensure_ascii=False, indent=2),
         )
-        rating = client.chat_json(
+        rating = simulated_user_client.chat_json(
             model=args.simulated_user_model,
             messages=state["simulated_user_messages"] + [{"role": "user", "content": prompt}],
             temperature=args.temperature,
@@ -370,12 +416,8 @@ def build_graph(ctx: WorkflowContext):
         return {"simulated_user_rating": rating}
 
     def tested_agent_summary(state: WorkflowState) -> WorkflowState:
-        prompt = ctx.prompt(
-            "tested_agent_summary",
-            dialog_transcript=transcript_text(state["dialog_messages"]),
-            dialog_messages_json=json.dumps(state["dialog_messages"], ensure_ascii=False, indent=2),
-        )
-        summary = client.chat_json(
+        prompt = ctx.prompt("tested_agent_summary")
+        summary = tested_agent_client.chat_json(
             model=args.tested_agent_model,
             messages=state["tested_agent_messages"] + [{"role": "user", "content": prompt}],
             temperature=args.temperature,
@@ -385,10 +427,12 @@ def build_graph(ctx: WorkflowContext):
 
     def evaluator_rating(state: WorkflowState) -> WorkflowState:
         sim_info = state["sim_user_info"]
+        user_personality = sim_info.get("用户性格", {})
         positive = {
+            "用户性格": user_personality.get("性格倾向", ""),
+            "对话风格偏好": user_personality.get("对话风格偏好", ""),
             "生活烦恼": sim_info.get("生活烦恼", {}),
             "当前核心需求": sim_info.get("个人经历", {}).get("当前核心需求", ""),
-            "对话锚点": sim_info.get("对话锚点", {}),
         }
         prompt = ctx.prompt(
             "evaluator_rating",
@@ -397,7 +441,7 @@ def build_graph(ctx: WorkflowContext):
             dialog_messages_json=json.dumps(state["dialog_messages"], ensure_ascii=False, indent=2),
             tested_agent_summary_json=json.dumps(state.get("tested_agent_summary", {}), ensure_ascii=False, indent=2),
         )
-        rating = client.chat_json(
+        rating = evaluator_client.chat_json(
             model=args.evaluator_model,
             messages=[{"role": "user", "content": prompt}],
             temperature=args.temperature,
@@ -445,10 +489,40 @@ def ensure_files(args: argparse.Namespace, prompt_paths: dict[str, Path]) -> Non
         if not path.exists():
             raise FileNotFoundError(f"文件不存在: {path}")
     if not args.dry_run:
-        if not args.base_url:
-            raise ValueError("缺少 OPENAI_BASE_URL（或 --base-url）")
-        if not args.api_key:
-            raise ValueError("缺少 OPENAI_API_KEY（或 --api-key）")
+        role_credentials(args)
+
+
+def role_credentials(args: argparse.Namespace) -> dict[str, tuple[str, str]]:
+    credentials = {
+        "simulated_user": (
+            args.simulated_user_base_url or args.base_url,
+            args.simulated_user_api_key or args.api_key,
+        ),
+        "tested_agent": (
+            args.tested_agent_base_url or args.base_url,
+            args.tested_agent_api_key or args.api_key,
+        ),
+        "evaluator": (
+            args.evaluator_base_url or args.base_url,
+            args.evaluator_api_key or args.api_key,
+        ),
+    }
+    missing = [name for name, (base_url, api_key) in credentials.items() if not base_url or not api_key]
+    if missing:
+        raise ValueError(
+            "缺少以下角色的 API 配置: "
+            + ", ".join(missing)
+            + "。可设置角色专用参数/环境变量，或设置通用 OPENAI_BASE_URL 与 OPENAI_API_KEY。"
+        )
+    return credentials
+
+
+def create_clients(args: argparse.Namespace) -> dict[str, OpenAICompatClient]:
+    credentials = role_credentials(args)
+    return {
+        name: OpenAICompatClient(base_url, api_key, args.timeout, args.retries, args.debug_http)
+        for name, (base_url, api_key) in credentials.items()
+    }
 
 
 def prompt_paths_from_config() -> dict[str, Path]:
@@ -470,6 +544,7 @@ def initial_state(row: pd.Series, sim_info: dict[str, Any], turns: int) -> Workf
     return {
         "run_id": str(uuid.uuid4()),
         "created_at": datetime.now().isoformat(timespec="seconds"),
+        "ID": row_id,
         "case_id": row_id,
         "sample_pick_order": int(float(row.get("sample_pick_order", 0))),
         "turn": 0,
@@ -488,8 +563,17 @@ def run(args: argparse.Namespace) -> None:
 
     fact_df = pd.read_csv(args.fact_csv, encoding="utf-8-sig")
     sim_records = load_sim_user_records(args.sim_user_jsonl)
-    selected = select_fact_rows(fact_df, args.ids, args.start, args.limit)
     success_ids = set() if args.regenerate_existing else load_success_ids(args.success_jsonl)
+    explicit_ids = bool(args.ids.strip())
+    selected = select_fact_rows(
+        df=fact_df,
+        ids=args.ids,
+        start=args.start,
+        limit=args.limit,
+        success_ids=success_ids,
+        sim_records=sim_records,
+        allow_existing=args.regenerate_existing or explicit_ids,
+    )
 
     print(f"用户画像: {args.fact_csv}")
     print(f"模拟用户信息: {args.sim_user_jsonl}")
@@ -512,10 +596,13 @@ def run(args: argparse.Namespace) -> None:
             )
         return
 
+    clients = create_clients(args)
     ctx = WorkflowContext(
         args=args,
         prompt_paths=prompt_paths,
-        client=OpenAICompatClient(args.base_url, args.api_key, args.timeout, args.retries, args.debug_http),
+        simulated_user_client=clients["simulated_user"],
+        tested_agent_client=clients["tested_agent"],
+        evaluator_client=clients["evaluator"],
     )
     app = build_graph(ctx)
 
@@ -523,8 +610,8 @@ def run(args: argparse.Namespace) -> None:
     skip_count = 0
     error_count = 0
     for _, row in selected.iterrows():
-        row_id = str(row.get("ID", "")).lstrip("0")
-        if row_id in success_ids:
+        row_id = normalized_id(row.get("ID", ""))
+        if (not explicit_ids) and (not args.regenerate_existing) and row_id in success_ids:
             skip_count += 1
             print(f"[SKIP] ID={row.get('ID', '')} 已有成功记录")
             continue

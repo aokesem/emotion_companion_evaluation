@@ -1,0 +1,19 @@
+﻿# Secrets and local environment
+.env
+*.env
+数据生成代码/.env
+多轮对话测试工作流/.env
+
+# Python caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+
+# Editor and OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
