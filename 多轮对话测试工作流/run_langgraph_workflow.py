@@ -25,11 +25,9 @@ class WorkflowState(TypedDict, total=False):
     run_id: str
     created_at: str
     ID: str
-    case_id: str
     sample_pick_order: int
     turn: int
     max_turns: int
-    user_profile: str
     sim_user_info: dict[str, Any]
     dialog_messages: list[dict[str, Any]]
     simulated_user_messages: list[dict[str, str]]
@@ -233,7 +231,7 @@ def load_success_ids(path: Path) -> set[str]:
                 obj = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            row_id = str(obj.get("ID") or obj.get("case_id") or "").lstrip("0")
+            row_id = str(obj.get("ID", "")).lstrip("0")
             if row_id:
                 ids.add(row_id)
     return ids
@@ -241,13 +239,6 @@ def load_success_ids(path: Path) -> set[str]:
 
 def normalized_id(value: object) -> str:
     return str(value).strip().lstrip("0")
-
-
-def row_text(row: pd.Series, col: str) -> str:
-    value = row.get(col, "")
-    if pd.isna(value):
-        return ""
-    return str(value).strip()
 
 
 def select_fact_rows(
@@ -302,9 +293,28 @@ def save_jsonl(path: Path, obj: dict[str, Any]) -> None:
         f.write("\n")
 
 
-def print_dialog_line(case_id: str, round_no: int, speaker: str, content: str) -> None:
-    print(f"\n[{case_id}][第 {round_no} 轮][{speaker}]")
+def print_dialog_line(row_id: str, round_no: int, speaker: str, content: str) -> None:
+    print(f"\n[{row_id}][第 {round_no} 轮][{speaker}]")
     print(content.strip())
+
+
+def success_result(state: WorkflowState, args: argparse.Namespace) -> dict[str, Any]:
+    return {
+        "run_id": state["run_id"],
+        "created_at": state["created_at"],
+        "ID": state["ID"],
+        "sample_pick_order": state.get("sample_pick_order", ""),
+        "turns": state["max_turns"],
+        "models": {
+            "simulated_user": args.simulated_user_model,
+            "tested_agent": args.tested_agent_model,
+            "evaluator": args.evaluator_model,
+        },
+        "dialog_messages": state.get("dialog_messages", []),
+        "simulated_user_rating": state.get("simulated_user_rating", {}),
+        "tested_agent_summary": state.get("tested_agent_summary", {}),
+        "evaluator_rating": state.get("evaluator_rating", {}),
+    }
 
 
 def append_summary_csv(path: Path, state: WorkflowState) -> None:
@@ -312,7 +322,7 @@ def append_summary_csv(path: Path, state: WorkflowState) -> None:
     exists = path.exists()
     row = {
         "run_id": state["run_id"],
-        "ID": state["case_id"],
+        "ID": state["ID"],
         "sample_pick_order": state.get("sample_pick_order", ""),
         "turns": state["max_turns"],
         "simulated_user_rating_json": json.dumps(state.get("simulated_user_rating", {}), ensure_ascii=False),
@@ -338,7 +348,7 @@ def build_graph(ctx: WorkflowContext):
         sim_info = state["sim_user_info"]
         opening = get_opening_sentence(sim_info)
         if not opening:
-            raise ValueError(f"ID={state['case_id']} 缺少开场首句")
+            raise ValueError(f"ID={state['ID']} 缺少开场首句")
 
         sim_system = ctx.prompt(
             "simulated_user_dialog",
@@ -348,7 +358,7 @@ def build_graph(ctx: WorkflowContext):
         tested_system = ctx.prompt("tested_agent_dialog")
 
         if args.print_dialog:
-            print_dialog_line(state["case_id"], 1, "用户AI", opening)
+            print_dialog_line(state["ID"], 1, "用户AI", opening)
 
         return {
             "turn": 1,
@@ -372,7 +382,7 @@ def build_graph(ctx: WorkflowContext):
         )
         turn = state["turn"]
         if args.print_dialog:
-            print_dialog_line(state["case_id"], turn, "被测AI", reply)
+            print_dialog_line(state["ID"], turn, "被测AI", reply)
         return {
             "dialog_messages": state["dialog_messages"]
             + [{"round": turn, "speaker": "tested_agent", "content": reply}],
@@ -392,7 +402,7 @@ def build_graph(ctx: WorkflowContext):
         )
         next_turn = state["turn"] + 1
         if args.print_dialog:
-            print_dialog_line(state["case_id"], next_turn, "用户AI", reply)
+            print_dialog_line(state["ID"], next_turn, "用户AI", reply)
         return {
             "turn": next_turn,
             "dialog_messages": state["dialog_messages"]
@@ -450,8 +460,7 @@ def build_graph(ctx: WorkflowContext):
         return {"evaluator_rating": rating}
 
     def save_success(state: WorkflowState) -> WorkflowState:
-        result = dict(state)
-        save_jsonl(args.success_jsonl, result)
+        save_jsonl(args.success_jsonl, success_result(state, args))
         append_summary_csv(args.summary_csv, state)
         return state
 
@@ -538,18 +547,13 @@ def prompt_paths_from_config() -> dict[str, Path]:
 
 def initial_state(row: pd.Series, sim_info: dict[str, Any], turns: int) -> WorkflowState:
     row_id = str(row.get("ID", ""))
-    user_profile = row_text(row, "画像事实文本")
-    if not user_profile:
-        raise ValueError(f"ID={row_id} 缺少画像事实文本")
     return {
         "run_id": str(uuid.uuid4()),
         "created_at": datetime.now().isoformat(timespec="seconds"),
         "ID": row_id,
-        "case_id": row_id,
         "sample_pick_order": int(float(row.get("sample_pick_order", 0))),
         "turn": 0,
         "max_turns": turns,
-        "user_profile": user_profile,
         "sim_user_info": sim_info,
         "dialog_messages": [],
         "simulated_user_messages": [],
