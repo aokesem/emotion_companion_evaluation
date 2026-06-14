@@ -65,6 +65,26 @@ def resolve_path(path_text: str) -> Path:
     return (ROOT / path).resolve()
 
 
+def resolve_output_dir(path_text: str) -> Path:
+    path = Path(path_text)
+    if path.is_absolute():
+        return path
+    if path.parts and path.parts[0] == "outputs":
+        return (ROOT / path).resolve()
+    return (ROOT / "outputs" / path).resolve()
+
+
+def output_file_path(path_arg: Path | None, config_value: str, output_dir: Path) -> Path:
+    if path_arg is not None:
+        return resolve_path(str(path_arg))
+    if "{output_dir}" in config_value:
+        return Path(config_value.format(output_dir=str(output_dir))).resolve()
+    config_path = Path(config_value)
+    if config_path.is_absolute():
+        return config_path
+    return output_dir / config_path.name
+
+
 def parse_args() -> argparse.Namespace:
     config = load_config()
     defaults = config["defaults"]
@@ -73,9 +93,10 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="运行 LangGraph 多轮对话测试工作流")
     parser.add_argument("--fact-csv", type=Path, default=resolve_path(paths["fact_csv"]), help="用户画像事实文本 CSV")
     parser.add_argument("--sim-user-jsonl", type=Path, default=resolve_path(paths["sim_user_jsonl"]), help="模拟用户信息 JSONL")
-    parser.add_argument("--success-jsonl", type=Path, default=resolve_path(paths["success_jsonl"]), help="成功结果 JSONL")
-    parser.add_argument("--summary-csv", type=Path, default=resolve_path(paths["summary_csv"]), help="评分摘要 CSV")
-    parser.add_argument("--error-jsonl", type=Path, default=resolve_path(paths["error_jsonl"]), help="错误记录 JSONL")
+    parser.add_argument("--output-dir", type=str, default="", help="输出实验目录；相对路径默认位于 outputs/ 下")
+    parser.add_argument("--success-jsonl", type=Path, default=None, help="成功结果 JSONL；默认由 output-dir 派生")
+    parser.add_argument("--summary-csv", type=Path, default=None, help="评分摘要 CSV；默认由 output-dir 派生")
+    parser.add_argument("--error-jsonl", type=Path, default=None, help="错误记录 JSONL；默认由 output-dir 派生")
     parser.add_argument("--ids", type=str, default="", help="逗号分隔的 ID 列表；为空时按 start/limit 选择")
     parser.add_argument("--start", type=int, default=defaults["start"], help="起始行索引，0-based")
     parser.add_argument("--limit", type=int, default=defaults["limit"], help="处理条数；0 表示全部")
@@ -99,9 +120,17 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--continue-on-error", action="store_true", help="遇错后继续下一个样本")
     parser.add_argument("--dry-run", action="store_true", help="只检查数据和配置，不调用模型")
     parser.add_argument("--print-dialog", action="store_true", help="运行时实时打印用户 AI 与被测 AI 的对话内容")
+    parser.add_argument("--manual", action="store_true", help="手动输入被测 AI 每轮回复；仅生成用户 AI 主观评分")
     parser.add_argument("--regenerate-existing", action="store_true", help="不跳过已成功记录的 ID")
     parser.add_argument("--debug-http", action="store_true", help="输出接口响应诊断信息")
-    return parser.parse_args()
+    args = parser.parse_args()
+
+    output_dir_text = args.output_dir or ("manual" if args.manual else paths.get("output_dir", "outputs"))
+    args.output_dir = resolve_output_dir(output_dir_text)
+    args.success_jsonl = output_file_path(args.success_jsonl, paths["success_jsonl"], args.output_dir)
+    args.summary_csv = output_file_path(args.summary_csv, paths["summary_csv"], args.output_dir)
+    args.error_jsonl = output_file_path(args.error_jsonl, paths["error_jsonl"], args.output_dir)
+    return args
 
 
 def normalize_base_url(base_url: str) -> str:
@@ -298,6 +327,14 @@ def print_dialog_line(row_id: str, round_no: int, speaker: str, content: str) ->
     print(content.strip())
 
 
+def read_manual_reply(row_id: str, turn: int) -> str:
+    while True:
+        reply = input(f"\n[{row_id}][第 {turn} 轮][请输入被测AI回复] > ").strip()
+        if reply:
+            return reply
+        print("回复不能为空，请重新输入。")
+
+
 def success_result(state: WorkflowState, args: argparse.Namespace) -> dict[str, Any]:
     return {
         "run_id": state["run_id"],
@@ -305,10 +342,11 @@ def success_result(state: WorkflowState, args: argparse.Namespace) -> dict[str, 
         "ID": state["ID"],
         "sample_pick_order": state.get("sample_pick_order", ""),
         "turns": state["max_turns"],
-        "models": {
-            "simulated_user": args.simulated_user_model,
-            "tested_agent": args.tested_agent_model,
-            "evaluator": args.evaluator_model,
+        "run_config": {
+            "tested_agent_mode": "manual" if args.manual else "openai",
+            "simulated_user_model": args.simulated_user_model,
+            "tested_agent_model": "manual" if args.manual else args.tested_agent_model,
+            "evaluator_model": "" if args.manual else args.evaluator_model,
         },
         "dialog_messages": state.get("dialog_messages", []),
         "simulated_user_rating": state.get("simulated_user_rating", {}),
@@ -337,7 +375,7 @@ def append_summary_csv(path: Path, state: WorkflowState) -> None:
 
 
 def build_graph(ctx: WorkflowContext):
-    if ctx.simulated_user_client is None or ctx.tested_agent_client is None or ctx.evaluator_client is None:
+    if ctx.simulated_user_client is None:
         raise ValueError("dry-run 模式不需要构建可执行 graph")
     simulated_user_client = ctx.simulated_user_client
     tested_agent_client = ctx.tested_agent_client
@@ -355,40 +393,50 @@ def build_graph(ctx: WorkflowContext):
             sim_user_info_json=json.dumps(sim_info, ensure_ascii=False, indent=2),
             opening_sentence=opening,
         )
-        tested_system = ctx.prompt("tested_agent_dialog")
+        tested_system = "" if args.manual else ctx.prompt("tested_agent_dialog")
 
-        if args.print_dialog:
+        if args.print_dialog or args.manual:
             print_dialog_line(state["ID"], 1, "用户AI", opening)
 
-        return {
+        next_state: WorkflowState = {
             "turn": 1,
             "dialog_messages": [{"round": 1, "speaker": "simulated_user", "content": opening}],
             "simulated_user_messages": [
                 {"role": "system", "content": sim_system},
                 {"role": "assistant", "content": opening},
             ],
-            "tested_agent_messages": [
+            "tested_agent_messages": [],
+        }
+        if not args.manual:
+            next_state["tested_agent_messages"] = [
                 {"role": "system", "content": tested_system},
                 {"role": "user", "content": opening},
-            ],
-        }
+            ]
+        return next_state
 
     def tested_agent_reply(state: WorkflowState) -> WorkflowState:
-        reply = tested_agent_client.chat_text(
-            model=args.tested_agent_model,
-            messages=state["tested_agent_messages"],
-            temperature=args.temperature,
-            max_tokens=args.max_tokens,
-        )
         turn = state["turn"]
-        if args.print_dialog:
+        if args.manual:
+            reply = read_manual_reply(state["ID"], turn)
+        else:
+            if tested_agent_client is None:
+                raise ValueError("缺少被测 AI 客户端")
+            reply = tested_agent_client.chat_text(
+                model=args.tested_agent_model,
+                messages=state["tested_agent_messages"],
+                temperature=args.temperature,
+                max_tokens=args.max_tokens,
+            )
+        if args.print_dialog and not args.manual:
             print_dialog_line(state["ID"], turn, "被测AI", reply)
-        return {
+        next_state: WorkflowState = {
             "dialog_messages": state["dialog_messages"]
             + [{"round": turn, "speaker": "tested_agent", "content": reply}],
-            "tested_agent_messages": state["tested_agent_messages"] + [{"role": "assistant", "content": reply}],
             "simulated_user_messages": state["simulated_user_messages"] + [{"role": "user", "content": reply}],
         }
+        if not args.manual:
+            next_state["tested_agent_messages"] = state["tested_agent_messages"] + [{"role": "assistant", "content": reply}]
+        return next_state
 
     def route_after_tested_reply(state: WorkflowState) -> Literal["continue_dialog", "finish_dialog"]:
         return "finish_dialog" if state["turn"] >= state["max_turns"] else "continue_dialog"
@@ -401,15 +449,17 @@ def build_graph(ctx: WorkflowContext):
             max_tokens=args.max_tokens,
         )
         next_turn = state["turn"] + 1
-        if args.print_dialog:
+        if args.print_dialog or args.manual:
             print_dialog_line(state["ID"], next_turn, "用户AI", reply)
-        return {
+        next_state: WorkflowState = {
             "turn": next_turn,
             "dialog_messages": state["dialog_messages"]
             + [{"round": next_turn, "speaker": "simulated_user", "content": reply}],
             "simulated_user_messages": state["simulated_user_messages"] + [{"role": "assistant", "content": reply}],
-            "tested_agent_messages": state["tested_agent_messages"] + [{"role": "user", "content": reply}],
         }
+        if not args.manual:
+            next_state["tested_agent_messages"] = state["tested_agent_messages"] + [{"role": "user", "content": reply}]
+        return next_state
 
     def simulated_user_rating(state: WorkflowState) -> WorkflowState:
         prompt = ctx.prompt(
@@ -426,6 +476,10 @@ def build_graph(ctx: WorkflowContext):
         return {"simulated_user_rating": rating}
 
     def tested_agent_summary(state: WorkflowState) -> WorkflowState:
+        if args.manual:
+            return {"tested_agent_summary": {}}
+        if tested_agent_client is None:
+            raise ValueError("缺少被测 AI 客户端")
         prompt = ctx.prompt("tested_agent_summary")
         summary = tested_agent_client.chat_json(
             model=args.tested_agent_model,
@@ -436,6 +490,10 @@ def build_graph(ctx: WorkflowContext):
         return {"tested_agent_summary": summary}
 
     def evaluator_rating(state: WorkflowState) -> WorkflowState:
+        if args.manual:
+            return {"evaluator_rating": {}}
+        if evaluator_client is None:
+            raise ValueError("缺少评估 AI 客户端")
         sim_info = state["sim_user_info"]
         user_personality = sim_info.get("用户性格", {})
         positive = {
@@ -484,9 +542,12 @@ def build_graph(ctx: WorkflowContext):
         },
     )
     graph.add_edge("simulated_user_reply", "tested_agent_reply")
-    graph.add_edge("simulated_user_rating", "tested_agent_summary")
-    graph.add_edge("tested_agent_summary", "evaluator_rating")
-    graph.add_edge("evaluator_rating", "save_success")
+    if args.manual:
+        graph.add_edge("simulated_user_rating", "save_success")
+    else:
+        graph.add_edge("simulated_user_rating", "tested_agent_summary")
+        graph.add_edge("tested_agent_summary", "evaluator_rating")
+        graph.add_edge("evaluator_rating", "save_success")
     graph.add_edge("save_success", END)
     return graph.compile()
 
@@ -494,7 +555,16 @@ def build_graph(ctx: WorkflowContext):
 def ensure_files(args: argparse.Namespace, prompt_paths: dict[str, Path]) -> None:
     if args.turns <= 0:
         raise ValueError("--turns 必须为正整数")
-    for path in [args.fact_csv, args.sim_user_jsonl, *prompt_paths.values()]:
+    required_prompts = [prompt_paths["simulated_user_dialog"], prompt_paths["simulated_user_rating"]]
+    if not args.manual:
+        required_prompts.extend(
+            [
+                prompt_paths["tested_agent_dialog"],
+                prompt_paths["tested_agent_summary"],
+                prompt_paths["evaluator_rating"],
+            ]
+        )
+    for path in [args.fact_csv, args.sim_user_jsonl, *required_prompts]:
         if not path.exists():
             raise FileNotFoundError(f"文件不存在: {path}")
     if not args.dry_run:
@@ -506,16 +576,21 @@ def role_credentials(args: argparse.Namespace) -> dict[str, tuple[str, str]]:
         "simulated_user": (
             args.simulated_user_base_url or args.base_url,
             args.simulated_user_api_key or args.api_key,
-        ),
-        "tested_agent": (
-            args.tested_agent_base_url or args.base_url,
-            args.tested_agent_api_key or args.api_key,
-        ),
-        "evaluator": (
-            args.evaluator_base_url or args.base_url,
-            args.evaluator_api_key or args.api_key,
-        ),
+        )
     }
+    if not args.manual:
+        credentials.update(
+            {
+                "tested_agent": (
+                    args.tested_agent_base_url or args.base_url,
+                    args.tested_agent_api_key or args.api_key,
+                ),
+                "evaluator": (
+                    args.evaluator_base_url or args.base_url,
+                    args.evaluator_api_key or args.api_key,
+                ),
+            }
+        )
     missing = [name for name, (base_url, api_key) in credentials.items() if not base_url or not api_key]
     if missing:
         raise ValueError(
@@ -581,6 +656,8 @@ def run(args: argparse.Namespace) -> None:
 
     print(f"用户画像: {args.fact_csv}")
     print(f"模拟用户信息: {args.sim_user_jsonl}")
+    print(f"输出目录: {args.output_dir}")
+    print(f"被测模式: {'manual' if args.manual else 'openai'}")
     print(f"候选样本: {len(selected)}")
     print(f"对话轮数: {args.turns}")
     print(f"成功输出: {args.success_jsonl}")
@@ -605,8 +682,8 @@ def run(args: argparse.Namespace) -> None:
         args=args,
         prompt_paths=prompt_paths,
         simulated_user_client=clients["simulated_user"],
-        tested_agent_client=clients["tested_agent"],
-        evaluator_client=clients["evaluator"],
+        tested_agent_client=clients.get("tested_agent"),
+        evaluator_client=clients.get("evaluator"),
     )
     app = build_graph(ctx)
 

@@ -13,11 +13,12 @@
     "evaluator_model": "deepseek-v4-pro"
   },
   "paths": {
+    "output_dir": "outputs",
     "fact_csv": "../用户画像数据/用户画像_抽样500_事实文本.csv",
     "sim_user_jsonl": "../用户画像数据/模拟用户信息_500.jsonl",
-    "success_jsonl": "outputs/dialog_eval_runs.jsonl",
-    "summary_csv": "outputs/dialog_eval_summary.csv",
-    "error_jsonl": "outputs/dialog_eval_errors.jsonl",
+    "success_jsonl": "dialog_eval_runs.jsonl",
+    "summary_csv": "dialog_eval_summary.csv",
+    "error_jsonl": "dialog_eval_errors.jsonl",
     "simulated_user_dialog_prompt": "prompts/模拟用户对话提示词.txt",
     "tested_agent_dialog_prompt": "prompts/被测AI对话提示词.txt",
     "simulated_user_rating_prompt": "prompts/模拟用户评分提示词.txt",
