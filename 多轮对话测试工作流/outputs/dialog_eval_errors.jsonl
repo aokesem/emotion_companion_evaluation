@@ -6,3 +6,4 @@
 {"ID": "241116202002", "error": "模型调用失败: HTTPSConnectionPool(host='api.deepseek.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by ProxyError('Unable to connect to proxy', RemoteDisconnected('Remote end closed connection without response')))", "created_at": "2026-06-09T15:39:52"}
 {"ID": "64028317002", "error": "模型调用失败: HTTPSConnectionPool(host='api.deepseek.com', port=443): Max retries exceeded with url: /v1/chat/completions (Caused by ProxyError('Unable to connect to proxy', RemoteDisconnected('Remote end closed connection without response')))", "created_at": "2026-06-09T15:40:43"}
 {"ID": "64028310001", "error": "Invalid control character at: line 7 column 138 (char 210)", "created_at": "2026-06-13T14:20:05"}
+{"ID": "205304214001", "error": "Expecting ',' delimiter: line 16 column 13 (char 1008)", "created_at": "2026-06-14T21:38:54"}
