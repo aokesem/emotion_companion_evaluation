@@ -1,0 +1,18 @@
+﻿{
+  "deepseek_v4_pro": {
+    "base_url": "https://api.deepseek.com",
+    "api_key_env": "deepseek_v4_pro_KEY",
+    "model": "deepseek-v4-pro",
+    "output_dir": "deepseek_v4_pro",
+    "auto_append_v1": true,
+    "chat_completions_path": "/chat/completions"
+  },
+  "glm-4.7-flash": {
+    "base_url": "https://open.bigmodel.cn/api/paas/v4",
+    "api_key_env": "glm-4.7-flash_KEY",
+    "model": "glm-4.7-flash",
+    "output_dir": "glm-4.7-flash",
+    "auto_append_v1": false,
+    "chat_completions_path": "/chat/completions"
+  }
+}

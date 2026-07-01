@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """LangGraph workflow for simulated-user multi-turn dialog evaluation."""
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ from langgraph.graph import END, StateGraph
 
 ROOT = Path(__file__).resolve().parent
 CONFIG_PATH = ROOT / "workflow_config.json"
+TESTED_PROFILES_PATH = ROOT / "tested_model_profiles.json"
 
 
 class WorkflowState(TypedDict, total=False):
@@ -54,8 +55,18 @@ def load_dotenv(dotenv_path: Path) -> None:
 
 
 def load_config() -> dict[str, Any]:
-    with CONFIG_PATH.open("r", encoding="utf-8") as f:
+    with CONFIG_PATH.open("r", encoding="utf-8-sig") as f:
         return json.load(f)
+
+
+def load_tested_profiles() -> dict[str, dict[str, Any]]:
+    if not TESTED_PROFILES_PATH.exists():
+        return {}
+    with TESTED_PROFILES_PATH.open("r", encoding="utf-8-sig") as f:
+        data = json.load(f)
+    if not isinstance(data, dict):
+        raise ValueError(f"被测模型 profile 配置必须是 JSON 对象: {TESTED_PROFILES_PATH}")
+    return data
 
 
 def resolve_path(path_text: str) -> Path:
@@ -84,6 +95,16 @@ def output_file_path(path_arg: Path | None, config_value: str, output_dir: Path)
         return config_path
     return output_dir / config_path.name
 
+def env_value(env_names: Any) -> str:
+    if isinstance(env_names, list):
+        names = [str(name).strip() for name in env_names]
+    else:
+        names = [str(env_names).strip()]
+    for name in names:
+        if name and os.getenv(name):
+            return os.getenv(name, "")
+    return ""
+
 
 def parse_args() -> argparse.Namespace:
     config = load_config()
@@ -102,7 +123,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--limit", type=int, default=defaults["limit"], help="处理条数；0 表示全部")
     parser.add_argument("--turns", type=int, default=defaults["turns"], help="对话轮数；一轮为用户一句 + 被测 AI 一句")
     parser.add_argument("--simulated-user-model", type=str, default=defaults["simulated_user_model"], help="模拟用户模型名")
-    parser.add_argument("--tested-agent-model", type=str, default=defaults["tested_agent_model"], help="被测 AI 模型名")
+    parser.add_argument("--tested-profile", type=str, default=defaults.get("tested_profile", ""), help="被测模型 profile 名，读取 tested_model_profiles.json")
+    parser.add_argument("--tested-agent-model", type=str, default=None, help="被测 AI 模型名；可覆盖 tested-profile 中的模型名")
     parser.add_argument("--evaluator-model", type=str, default=defaults["evaluator_model"], help="评估 AI 模型名")
     parser.add_argument("--base-url", type=str, default=os.getenv("OPENAI_BASE_URL", ""), help="通用 API Base URL，未设置角色专用 URL 时使用")
     parser.add_argument("--api-key", type=str, default=os.getenv("OPENAI_API_KEY", ""), help="通用 API Key，未设置角色专用 Key 时使用")
@@ -125,7 +147,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--debug-http", action="store_true", help="输出接口响应诊断信息")
     args = parser.parse_args()
 
-    output_dir_text = args.output_dir or ("manual" if args.manual else paths.get("output_dir", "outputs"))
+    apply_tested_profile(args, defaults)
+
+    output_dir_text = args.output_dir or ("manual" if args.manual else args.profile_output_dir or paths.get("output_dir", "outputs"))
     args.output_dir = resolve_output_dir(output_dir_text)
     args.success_jsonl = output_file_path(args.success_jsonl, paths["success_jsonl"], args.output_dir)
     args.summary_csv = output_file_path(args.summary_csv, paths["summary_csv"], args.output_dir)
@@ -133,9 +157,43 @@ def parse_args() -> argparse.Namespace:
     return args
 
 
-def normalize_base_url(base_url: str) -> str:
+def apply_tested_profile(args: argparse.Namespace, defaults: dict[str, Any]) -> None:
+    args.profile_output_dir = ""
+    args.tested_agent_auto_append_v1 = True
+    args.tested_agent_chat_completions_path = "/chat/completions"
+
+    if args.tested_profile:
+        profiles = load_tested_profiles()
+        profile = profiles.get(args.tested_profile)
+        if profile is None:
+            available = ", ".join(sorted(profiles)) or "无"
+            raise ValueError(f"未找到被测模型 profile: {args.tested_profile}。可用 profile: {available}")
+        if not isinstance(profile, dict):
+            raise ValueError(f"被测模型 profile 必须是对象: {args.tested_profile}")
+
+        base_url = str(profile.get("base_url", "")).strip()
+        base_url_env = profile.get("base_url_env", "")
+        if base_url_env:
+            base_url = env_value(base_url_env)
+        args.tested_agent_base_url = base_url
+
+        api_key = str(profile.get("api_key", "")).strip()
+        api_key_env = profile.get("api_key_env", "")
+        if api_key_env:
+            api_key = env_value(api_key_env)
+        args.tested_agent_api_key = api_key
+        if args.tested_agent_model is None:
+            args.tested_agent_model = str(profile.get("model", "")).strip()
+        args.profile_output_dir = str(profile.get("output_dir", args.tested_profile)).strip()
+        args.tested_agent_auto_append_v1 = bool(profile.get("auto_append_v1", True))
+        args.tested_agent_chat_completions_path = str(profile.get("chat_completions_path", "/chat/completions")).strip()
+    elif args.tested_agent_model is None:
+        args.tested_agent_model = defaults.get("tested_agent_model", "")
+
+
+def normalize_base_url(base_url: str, auto_append_v1: bool = True) -> str:
     base = base_url.rstrip("/")
-    if not base.endswith("/v1"):
+    if auto_append_v1 and not base.endswith("/v1"):
         base = f"{base}/v1"
     return base
 
@@ -171,12 +229,22 @@ def parse_json_content(content: str) -> dict[str, Any]:
 
 
 class OpenAICompatClient:
-    def __init__(self, base_url: str, api_key: str, timeout: int, retries: int, debug_http: bool = False):
-        self.base_url = normalize_base_url(base_url)
+    def __init__(
+        self,
+        base_url: str,
+        api_key: str,
+        timeout: int,
+        retries: int,
+        debug_http: bool = False,
+        auto_append_v1: bool = True,
+        chat_completions_path: str = "/chat/completions",
+    ):
+        self.base_url = normalize_base_url(base_url, auto_append_v1)
         self.api_key = api_key
         self.timeout = timeout
         self.retries = retries
         self.debug_http = debug_http
+        self.chat_completions_path = "/" + chat_completions_path.strip("/")
         self.session = requests.Session()
 
     def chat_text(self, model: str, messages: list[dict[str, str]], temperature: float, max_tokens: int) -> str:
@@ -186,7 +254,7 @@ class OpenAICompatClient:
         return parse_json_content(self._chat(model, messages, temperature, max_tokens))
 
     def _chat(self, model: str, messages: list[dict[str, str]], temperature: float, max_tokens: int) -> str:
-        url = f"{self.base_url}/chat/completions"
+        url = f"{self.base_url}{self.chat_completions_path}"
         payload = {
             "model": model,
             "messages": messages,
@@ -344,6 +412,7 @@ def success_result(state: WorkflowState, args: argparse.Namespace) -> dict[str, 
         "turns": state["max_turns"],
         "run_config": {
             "tested_agent_mode": "manual" if args.manual else "openai",
+            "tested_profile": args.tested_profile if not args.manual else "",
             "simulated_user_model": args.simulated_user_model,
             "tested_agent_model": "manual" if args.manual else args.tested_agent_model,
             "evaluator_model": "" if args.manual else args.evaluator_model,
@@ -571,27 +640,33 @@ def ensure_files(args: argparse.Namespace, prompt_paths: dict[str, Path]) -> Non
         role_credentials(args)
 
 
-def role_credentials(args: argparse.Namespace) -> dict[str, tuple[str, str]]:
+def role_credentials(args: argparse.Namespace) -> dict[str, dict[str, Any]]:
     credentials = {
-        "simulated_user": (
-            args.simulated_user_base_url or args.base_url,
-            args.simulated_user_api_key or args.api_key,
-        )
+        "simulated_user": {
+            "base_url": args.simulated_user_base_url or args.base_url,
+            "api_key": args.simulated_user_api_key or args.api_key,
+            "auto_append_v1": True,
+            "chat_completions_path": "/chat/completions",
+        }
     }
     if not args.manual:
         credentials.update(
             {
-                "tested_agent": (
-                    args.tested_agent_base_url or args.base_url,
-                    args.tested_agent_api_key or args.api_key,
-                ),
-                "evaluator": (
-                    args.evaluator_base_url or args.base_url,
-                    args.evaluator_api_key or args.api_key,
-                ),
+                "tested_agent": {
+                    "base_url": args.tested_agent_base_url or args.base_url,
+                    "api_key": args.tested_agent_api_key or args.api_key,
+                    "auto_append_v1": args.tested_agent_auto_append_v1,
+                    "chat_completions_path": args.tested_agent_chat_completions_path,
+                },
+                "evaluator": {
+                    "base_url": args.evaluator_base_url or args.base_url,
+                    "api_key": args.evaluator_api_key or args.api_key,
+                    "auto_append_v1": True,
+                    "chat_completions_path": "/chat/completions",
+                },
             }
         )
-    missing = [name for name, (base_url, api_key) in credentials.items() if not base_url or not api_key]
+    missing = [name for name, config in credentials.items() if not config["base_url"] or not config["api_key"]]
     if missing:
         raise ValueError(
             "缺少以下角色的 API 配置: "
@@ -604,8 +679,16 @@ def role_credentials(args: argparse.Namespace) -> dict[str, tuple[str, str]]:
 def create_clients(args: argparse.Namespace) -> dict[str, OpenAICompatClient]:
     credentials = role_credentials(args)
     return {
-        name: OpenAICompatClient(base_url, api_key, args.timeout, args.retries, args.debug_http)
-        for name, (base_url, api_key) in credentials.items()
+        name: OpenAICompatClient(
+            config["base_url"],
+            config["api_key"],
+            args.timeout,
+            args.retries,
+            args.debug_http,
+            config["auto_append_v1"],
+            config["chat_completions_path"],
+        )
+        for name, config in credentials.items()
     }
 
 
@@ -658,6 +741,9 @@ def run(args: argparse.Namespace) -> None:
     print(f"模拟用户信息: {args.sim_user_jsonl}")
     print(f"输出目录: {args.output_dir}")
     print(f"被测模式: {'manual' if args.manual else 'openai'}")
+    if not args.manual:
+        print(f"被测 profile: {args.tested_profile or '未指定'}")
+        print(f"被测模型: {args.tested_agent_model}")
     print(f"候选样本: {len(selected)}")
     print(f"对话轮数: {args.turns}")
     print(f"成功输出: {args.success_jsonl}")
@@ -739,3 +825,13 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
+
+
+
+
+
+
+
+
+

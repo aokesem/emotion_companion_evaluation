@@ -1,0 +1,4 @@
+{"ID": "57457126001", "error": "模型调用失败: HTTP 404: {\"timestamp\":\"2026-06-29T03:48:51.995+00:00\",\"status\":404,\"error\":\"Not Found\",\"path\":\"/v4/v1/chat/completions\"}", "created_at": "2026-06-29T11:48:51"}
+{"ID": "57457126001", "error": "模型调用失败: HTTP 404: {\"timestamp\":\"2026-06-29T03:49:50.519+00:00\",\"status\":404,\"error\":\"Not Found\",\"path\":\"/v4/v1/chat/completions\"}", "created_at": "2026-06-29T11:49:50"}
+{"ID": "57457126001", "error": "模型调用失败: HTTP 404: {\"timestamp\":\"2026-06-29T05:55:29.193+00:00\",\"status\":404,\"error\":\"Not Found\",\"path\":\"/v4/v1/chat/completions\"}", "created_at": "2026-06-29T13:55:29"}
+{"ID": "57457126001", "error": "模型调用失败: HTTP 404: {\"timestamp\":\"2026-06-29T05:59:41.395+00:00\",\"status\":404,\"error\":\"Not Found\",\"path\":\"/v1/chat/completions\"}", "created_at": "2026-06-29T13:59:41"}

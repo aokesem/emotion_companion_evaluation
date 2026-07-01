@@ -1,28 +1,28 @@
-{
-  "defaults": {
-    "turns": 10,
-    "start": 0,
-    "limit": 1,
-    "timeout": 90,
-    "retries": 3,
-    "sleep": 0.0,
-    "temperature": 0.2,
-    "max_tokens": 10000,
-    "simulated_user_model": "deepseek-v4-pro",
-    "tested_agent_model": "deepseek-v4-pro",
-    "evaluator_model": "deepseek-v4-pro"
-  },
-  "paths": {
-    "output_dir": "outputs",
-    "fact_csv": "../用户画像数据/用户画像_抽样500_事实文本.csv",
-    "sim_user_jsonl": "../用户画像数据/模拟用户信息_500.jsonl",
-    "success_jsonl": "dialog_eval_runs.jsonl",
-    "summary_csv": "dialog_eval_summary.csv",
-    "error_jsonl": "dialog_eval_errors.jsonl",
-    "simulated_user_dialog_prompt": "prompts/模拟用户对话提示词.txt",
-    "tested_agent_dialog_prompt": "prompts/被测AI对话提示词.txt",
-    "simulated_user_rating_prompt": "prompts/模拟用户评分提示词.txt",
-    "tested_agent_summary_prompt": "prompts/被测AI总结提示词.txt",
-    "evaluator_rating_prompt": "prompts/评估AI评分提示词.txt"
-  }
+﻿{
+    "defaults":  {
+                     "turns":  10,
+                     "start":  0,
+                     "limit":  1,
+                     "timeout":  90,
+                     "retries":  3,
+                     "sleep":  0.0,
+                     "temperature":  0.2,
+                     "max_tokens":  10000,
+                     "simulated_user_model":  "deepseek-v4-pro",
+                     "tested_profile":  "deepseek_v4_pro",
+                     "evaluator_model":  "deepseek-v4-pro"
+                 },
+    "paths":  {
+                  "output_dir":  "outputs",
+                  "fact_csv":  "../用户画像数据/用户画像_抽样500_事实文本.csv",
+                  "sim_user_jsonl":  "../用户画像数据/模拟用户信息_500.jsonl",
+                  "success_jsonl":  "dialog_eval_runs.jsonl",
+                  "summary_csv":  "dialog_eval_summary.csv",
+                  "error_jsonl":  "dialog_eval_errors.jsonl",
+                  "simulated_user_dialog_prompt":  "prompts/模拟用户对话提示词.txt",
+                  "tested_agent_dialog_prompt":  "prompts/被测AI对话提示词.txt",
+                  "simulated_user_rating_prompt":  "prompts/模拟用户评分提示词.txt",
+                  "tested_agent_summary_prompt":  "prompts/被测AI总结提示词.txt",
+                  "evaluator_rating_prompt":  "prompts/评估AI评分提示词.txt"
+              }
 }
