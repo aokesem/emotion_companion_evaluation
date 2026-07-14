@@ -7,11 +7,67 @@
     "auto_append_v1": true,
     "chat_completions_path": "/chat/completions"
   },
+  "deepseek_v4_flash": {
+    "base_url": "https://api.deepseek.com",
+    "api_key_env": "deepseek_v4_pro_KEY",
+    "model": "deepseek-v4-flash",
+    "output_dir": "deepseek_v4_flash",
+    "auto_append_v1": true,
+    "chat_completions_path": "/chat/completions"
+  },
   "glm-4.7-flash": {
     "base_url": "https://open.bigmodel.cn/api/paas/v4",
     "api_key_env": "glm-4.7-flash_KEY",
     "model": "glm-4.7-flash",
     "output_dir": "glm-4.7-flash",
+    "auto_append_v1": false,
+    "chat_completions_path": "/chat/completions"
+  },
+  "glm-4-plus": {
+    "base_url": "https://open.bigmodel.cn/api/paas/v4",
+    "api_key_env": "glm-4.7-flash_KEY",
+    "model": "glm-4-plus",
+    "output_dir": "glm-4-plus",
+    "auto_append_v1": false,
+    "chat_completions_path": "/chat/completions"
+  },
+  "kimi-k2.5": {
+    "base_url": "https://api.moonshot.cn/v1",
+    "api_key_env": "Kimi_Key",
+    "model": "kimi-k2.5",
+    "output_dir": "kimi-k2.5",
+    "auto_append_v1": false,
+    "chat_completions_path": "/chat/completions"
+  },
+  "moonshot-v1-32k": {
+    "base_url": "https://api.moonshot.cn/v1",
+    "api_key_env": "Kimi_Key",
+    "model": "moonshot-v1-32k",
+    "output_dir": "moonshot-v1-32k",
+    "auto_append_v1": false,
+    "chat_completions_path": "/chat/completions"
+  },
+  "moonshot-v1-8k": {
+    "base_url": "https://api.moonshot.cn/v1",
+    "api_key_env": "Kimi_Key",
+    "model": "moonshot-v1-8k",
+    "output_dir": "moonshot-v1-8k",
+    "auto_append_v1": false,
+    "chat_completions_path": "/chat/completions"
+  },
+  "doubao-seed-character-260628": {
+    "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+    "api_key_env": "Doubao_Key",
+    "model": "doubao-seed-character-260628",
+    "output_dir": "doubao-seed-character-260628",
+    "auto_append_v1": false,
+    "chat_completions_path": "/chat/completions"
+  },
+  "doubao-seed-2-0-lite-260428": {
+    "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+    "api_key_env": "Doubao_Key",
+    "model": "doubao-seed-2-0-lite-260428",
+    "output_dir": "doubao-seed-2-0-lite-260428",
     "auto_append_v1": false,
     "chat_completions_path": "/chat/completions"
   }

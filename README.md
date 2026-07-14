@@ -1,5 +1,3 @@
-python .\多轮对话测试工作流\run_langgraph_workflow.py --start 0 --limit 1 --turns 10 --print-dialog --continue-on-error --output-dir zhipu_GLM4.7flash
-
 
 #文件说明
 在多轮对话测试工作流的workflow_config.json保存了全局设置，例如轮数、默认处理条数、模拟用户模型、评估模型、数据路径、prompt 路径，默认模拟用户模型和评估模型为deepseek v4 pro。
@@ -11,9 +9,8 @@ tested_model_profiles.json中保存“被测模型”的配置。修改文件或
 extract_eval_scores.py，运行该文件，从结果中提取精简评分表和平均分。
 
 #运行方法
-使用一下命令开始对被测模型测试：
-python .\多轮对话测试工作流\run_langgraph_workflow.py --tested-profile zhipu_GLM4.7flash --start 0 --limit 1 --turns 10 --print-dialog --continue-on-error
-参数含义：
+使用以下命令开始对被测模型测试：
+python .\多轮对话测试工作流\run_langgraph_workflow.py --tested-profile glm-4-plus  --start 0 --limit 1 --turns 10 --print-dialog --continue-on-error      
 --tested-profile zhipu_GLM4.7flash：选择被测模型名称，模型名称可在tested_model_profiles.json中定义。
 --start 0：从样本第 0 行开始。
 --limit 1：只跑 1 个用户。

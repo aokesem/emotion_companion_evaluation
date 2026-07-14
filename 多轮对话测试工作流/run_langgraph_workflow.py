@@ -1,4 +1,4 @@
-﻿# -*- coding: utf-8 -*-
+# -*- coding: utf-8 -*-
 """LangGraph workflow for simulated-user multi-turn dialog evaluation."""
 from __future__ import annotations
 
@@ -251,7 +251,34 @@ class OpenAICompatClient:
         return self._chat(model, messages, temperature, max_tokens).strip()
 
     def chat_json(self, model: str, messages: list[dict[str, str]], temperature: float, max_tokens: int) -> dict[str, Any]:
-        return parse_json_content(self._chat(model, messages, temperature, max_tokens))
+        content = self._chat(model, messages, temperature, max_tokens)
+        try:
+            return parse_json_content(content)
+        except Exception as first_error:  # noqa: BLE001
+            repaired = self.repair_json(model, content, temperature, max_tokens)
+            try:
+                return parse_json_content(repaired)
+            except Exception as repair_error:  # noqa: BLE001
+                raw_preview = content.strip().replace("\n", " ")[:500]
+                repair_preview = repaired.strip().replace("\n", " ")[:500]
+                raise ValueError(
+                    "模型返回 JSON 解析失败，且自动修复失败。"
+                    f"首次错误: {first_error}; 修复错误: {repair_error}; "
+                    f"原始输出片段: {raw_preview}; 修复输出片段: {repair_preview}"
+                ) from repair_error
+
+    def repair_json(self, model: str, content: str, temperature: float, max_tokens: int) -> str:
+        repair_messages = [
+            {
+                "role": "system",
+                "content": "你是 JSON 修复器。请只输出一个合法 JSON 对象，不要输出 markdown，不要解释，不要增删字段含义。",
+            },
+            {
+                "role": "user",
+                "content": "下面内容本应是 JSON 对象，但格式可能有错误。请修复为合法 JSON 对象，保留原始语义：\n" + content,
+            },
+        ]
+        return self._chat(model, repair_messages, min(temperature, 0.1), max_tokens)
 
     def _chat(self, model: str, messages: list[dict[str, str]], temperature: float, max_tokens: int) -> str:
         url = f"{self.base_url}{self.chat_completions_path}"
@@ -315,10 +342,12 @@ def load_sim_user_records(path: Path) -> dict[str, dict[str, Any]]:
     return records
 
 
-def load_success_ids(path: Path) -> set[str]:
+def load_success_tasks(path: Path) -> tuple[set[int], set[str]]:
+    """Load completed draws, with ID fallback only for legacy records."""
     if not path.exists():
-        return set()
-    ids: set[str] = set()
+        return set(), set()
+    pick_orders: set[int] = set()
+    legacy_ids: set[str] = set()
     with path.open("r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
@@ -328,11 +357,17 @@ def load_success_ids(path: Path) -> set[str]:
                 obj = json.loads(line)
             except json.JSONDecodeError:
                 continue
-            row_id = str(obj.get("ID", "")).lstrip("0")
+            pick_order = obj.get("sample_pick_order")
+            if pick_order not in (None, ""):
+                try:
+                    pick_orders.add(int(float(pick_order)))
+                    continue
+                except (TypeError, ValueError):
+                    pass
+            row_id = normalized_id(obj.get("ID", ""))
             if row_id:
-                ids.add(row_id)
-    return ids
-
+                legacy_ids.add(row_id)
+    return pick_orders, legacy_ids
 
 def normalized_id(value: object) -> str:
     return str(value).strip().lstrip("0")
@@ -343,7 +378,8 @@ def select_fact_rows(
     ids: str,
     start: int,
     limit: int,
-    success_ids: set[str],
+    success_pick_orders: set[int],
+    legacy_success_ids: set[str],
     sim_records: dict[str, dict[str, Any]],
     allow_existing: bool,
 ) -> pd.DataFrame:
@@ -354,9 +390,10 @@ def select_fact_rows(
     rows: list[pd.Series] = []
     for _, row in df.iloc[start:].iterrows():
         row_id = normalized_id(row.get("ID", ""))
+        pick_order = int(float(row.get("sample_pick_order", 0)))
         if not row_id:
             continue
-        if (not allow_existing) and row_id in success_ids:
+        if (not allow_existing) and (pick_order in success_pick_orders or row_id in legacy_success_ids):
             continue
         if row_id not in sim_records:
             continue
@@ -364,7 +401,6 @@ def select_fact_rows(
         if limit > 0 and len(rows) >= limit:
             break
     return pd.DataFrame(rows, columns=df.columns)
-
 
 def get_opening_sentence(sim_info: dict[str, Any]) -> str:
     anchor = sim_info.get("对话锚点", {})
@@ -725,14 +761,15 @@ def run(args: argparse.Namespace) -> None:
 
     fact_df = pd.read_csv(args.fact_csv, encoding="utf-8-sig")
     sim_records = load_sim_user_records(args.sim_user_jsonl)
-    success_ids = set() if args.regenerate_existing else load_success_ids(args.success_jsonl)
+    success_pick_orders, legacy_success_ids = (set(), set()) if args.regenerate_existing else load_success_tasks(args.success_jsonl)
     explicit_ids = bool(args.ids.strip())
     selected = select_fact_rows(
         df=fact_df,
         ids=args.ids,
         start=args.start,
         limit=args.limit,
-        success_ids=success_ids,
+        success_pick_orders=success_pick_orders,
+        legacy_success_ids=legacy_success_ids,
         sim_records=sim_records,
         allow_existing=args.regenerate_existing or explicit_ids,
     )
@@ -757,9 +794,9 @@ def run(args: argparse.Namespace) -> None:
         for _, row in selected.iterrows():
             row_id = str(row.get("ID", "")).lstrip("0")
             print(
-                f"[DRY] ID={row.get('ID', '')} "
+                f"[DRY] sample_pick_order={row.get('sample_pick_order', '')} ID={row.get('ID', '')} "
                 f"has_sim_info={row_id in sim_records} "
-                f"already_success={row_id in success_ids}"
+                f"already_success={int(float(row.get('sample_pick_order', 0))) in success_pick_orders or row_id in legacy_success_ids}"
             )
         return
 
@@ -778,14 +815,15 @@ def run(args: argparse.Namespace) -> None:
     error_count = 0
     for _, row in selected.iterrows():
         row_id = normalized_id(row.get("ID", ""))
-        if (not explicit_ids) and (not args.regenerate_existing) and row_id in success_ids:
+        pick_order = int(float(row.get("sample_pick_order", 0)))
+        if (not explicit_ids) and (not args.regenerate_existing) and (pick_order in success_pick_orders or row_id in legacy_success_ids):
             skip_count += 1
-            print(f"[SKIP] ID={row.get('ID', '')} 已有成功记录")
+            print(f"[SKIP] sample_pick_order={pick_order} ID={row.get('ID', '')} 已有成功记录")
             continue
         sim_info = sim_records.get(row_id)
         if sim_info is None:
             error_count += 1
-            err = {"ID": str(row.get("ID", "")), "error": "缺少模拟用户信息", "created_at": datetime.now().isoformat(timespec="seconds")}
+            err = {"ID": str(row.get("ID", "")), "sample_pick_order": pick_order, "error": "缺少模拟用户信息", "created_at": datetime.now().isoformat(timespec="seconds")}
             save_jsonl(args.error_jsonl, err)
             print(f"[ERR] ID={row.get('ID', '')} 缺少模拟用户信息")
             if not args.continue_on_error:
@@ -793,15 +831,16 @@ def run(args: argparse.Namespace) -> None:
             continue
         try:
             app.invoke(initial_state(row, sim_info, args.turns))
-            success_ids.add(row_id)
+            success_pick_orders.add(pick_order)
             done_count += 1
-            print(f"[OK] ID={row.get('ID', '')}")
+            print(f"[OK] sample_pick_order={pick_order} ID={row.get('ID', '')}")
             if args.sleep > 0:
                 time.sleep(args.sleep)
         except Exception as exc:  # noqa: BLE001
             error_count += 1
             err = {
                 "ID": str(row.get("ID", "")),
+                "sample_pick_order": pick_order,
                 "error": str(exc),
                 "created_at": datetime.now().isoformat(timespec="seconds"),
             }
@@ -825,6 +864,7 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+
 
 
 
