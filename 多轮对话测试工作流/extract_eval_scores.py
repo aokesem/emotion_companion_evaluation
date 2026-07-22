@@ -43,13 +43,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output-dir", type=str, default="", help="输出实验目录；相对路径默认位于 outputs/ 下")
     parser.add_argument("--input", type=Path, default=None, help="输入 summary CSV；默认由 output-dir 派生")
     parser.add_argument("--output", type=Path, default=None, help="输出精简评分 CSV；默认由 output-dir 派生")
+    parser.add_argument("--score-summary-output", type=Path, default=None, help="输出总体评分 JSON；默认由 output-dir 派生")
     args = parser.parse_args()
 
     output_dir = resolve_output_dir(args.output_dir) if args.output_dir else DEFAULT_OUTPUT_DIR
     args.input = resolve_path(args.input) if args.input is not None else output_dir / "dialog_eval_summary.csv"
     args.output = resolve_path(args.output) if args.output is not None else output_dir / "dialog_eval_scores.csv"
+    args.score_summary_output = (
+        resolve_path(args.score_summary_output)
+        if args.score_summary_output is not None
+        else output_dir / "dialog_eval_score_summary.json"
+    )
     return args
-
 
 def resolve_path(path: Path) -> Path:
     if path.is_absolute():
@@ -168,8 +173,8 @@ def extract_score_row(row: dict[str, str], row_no: int) -> tuple[dict[str, str],
     return output, scores
 
 
-def print_summary(score_rows: list[dict[str, float | None]]) -> None:
-    print(f"样本数: {len(score_rows)}")
+def score_summary(score_rows: list[dict[str, float | None]]) -> dict[str, float | int | None]:
+    summary: dict[str, float | int | None] = {"样本数": len(score_rows)}
     metrics = [
         ("用户AI主观平均分均值", "user_avg"),
         ("评估AI平均分均值", "evaluator_avg"),
@@ -182,9 +187,14 @@ def print_summary(score_rows: list[dict[str, float | None]]) -> None:
         ("行动层评分均值", "action"),
     ]
     for label, key in metrics:
-        value = average([row[key] for row in score_rows])
-        print(f"{label}: {format_score(value)}")
+        summary[label] = average([row[key] for row in score_rows])
+    return summary
 
+
+def print_summary(summary: dict[str, float | int | None]) -> None:
+    for label, value in summary.items():
+        display = format_score(value) if isinstance(value, float) else value
+        print(f"{label}: {display}")
 
 def main() -> None:
     args = parse_args()
@@ -203,10 +213,16 @@ def main() -> None:
         writer.writeheader()
         writer.writerows(output_rows)
 
+    summary = score_summary(score_rows)
+    args.score_summary_output.parent.mkdir(parents=True, exist_ok=True)
+    with args.score_summary_output.open("w", encoding="utf-8") as f:
+        json.dump(summary, f, ensure_ascii=False, indent=2)
+        f.write("\n")
+
     print(f"输入: {args.input}")
     print(f"输出: {args.output}")
-    print_summary(score_rows)
-
+    print(f"总体评分: {args.score_summary_output}")
+    print_summary(summary)
 
 if __name__ == "__main__":
     main()
