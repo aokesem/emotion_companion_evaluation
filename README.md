@@ -12,8 +12,7 @@ extract_eval_scores.py，运行该文件，从结果中提取精简评分表和�
 
 使用以下命令开始对被测模型测试：
 
-python .\多轮对话测试工作流\run_langgraph_workflow.py --tested-profile glm-4-plus  --start 0 --limit 1 --turns 10 --print-dialog 
---continue-on-error      
+python .\多轮对话测试工作流\run_langgraph_workflow.py --tested-profile glm-4-plus  --start 0 --limit 100 --turns 10 --print-dialog --continue-on-error      
 
 参数说明：
 
@@ -29,9 +28,18 @@ python .\多轮对话测试工作流\run_langgraph_workflow.py --tested-profile 
 
 --continue-on-error：在某条报错后不停止，继续运行。
 
-每个 profile 会自动输出到自己的目录，在完成运行后可以使用python .\多轮对话测试工作流\extract_eval_scores.py --output-dir (目录名) 自动提取指定目录下的评分并生成文件。
+每个 profile 会自动输出到自己的目录。
+
+
+
+使用以下命令开始数据进行评分计算：
+
+python .\多轮对话测试工作流\extract_eval_scores.py --output-dir (目录名) 
+
+将自动提取指定目录下的评分并生成文件。
 
 使用 --manual 进行手动模式。手动模式下模拟用户 AI 正常发言，需要在终端手动输入被测 AI 回复。默认输出到outputs/manual/。只生成模拟用户 AI 主观评分，不生成被测 AI 总结，不生成评估 AI 评分。
+使用 --all 对outputs文件夹下所有模型文件夹进行评分计算，并生成汇总评分表
 
 # 事实数据的筛选过程
 

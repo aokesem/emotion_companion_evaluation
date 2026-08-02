@@ -15,6 +15,14 @@
     "auto_append_v1": true,
     "chat_completions_path": "/chat/completions"
   },
+  "glm-5-2-260617": {
+    "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+    "api_key_env": "Doubao_Key",
+    "model": "glm-5-2-260617",
+    "output_dir": "glm-5-2-260617",
+    "auto_append_v1": false,
+    "chat_completions_path": "/chat/completions"
+  },
   "glm-4.7-flash": {
     "base_url": "https://open.bigmodel.cn/api/paas/v4",
     "api_key_env": "glm-4.7-flash_KEY",
@@ -63,11 +71,43 @@
     "auto_append_v1": false,
     "chat_completions_path": "/chat/completions"
   },
+  "doubao-seed-2-0-pro-260215": {
+    "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+    "api_key_env": "Doubao_Key",
+    "model": "doubao-seed-2-0-pro-260215",
+    "output_dir": "doubao-seed-2-0-pro-260215",
+    "auto_append_v1": false,
+    "chat_completions_path": "/chat/completions"
+  },
   "doubao-seed-2-0-lite-260428": {
     "base_url": "https://ark.cn-beijing.volces.com/api/v3",
     "api_key_env": "Doubao_Key",
     "model": "doubao-seed-2-0-lite-260428",
     "output_dir": "doubao-seed-2-0-lite-260428",
+    "auto_append_v1": false,
+    "chat_completions_path": "/chat/completions"
+  },
+  "doubao-seed-2-0-mini-260428": {
+    "base_url": "https://ark.cn-beijing.volces.com/api/v3",
+    "api_key_env": "Doubao_Key",
+    "model": "doubao-seed-2-0-mini-260428",
+    "output_dir": "doubao-seed-2-0-mini-260428",
+    "auto_append_v1": false,
+    "chat_completions_path": "/chat/completions"
+  },
+  "qwen3.7-plus-2026-05-26": {
+    "base_url": "https://llm-zodcqel1zk6wtxia.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+    "api_key_env": "Qwen_Key",
+    "model": "qwen3.7-plus-2026-05-26",
+    "output_dir": "qwen3.7-plus-2026-05-26",
+    "auto_append_v1": false,
+    "chat_completions_path": "/chat/completions"
+  },
+  "qwen3.7-flash-2026-07-15": {
+    "base_url": "https://llm-zodcqel1zk6wtxia.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+    "api_key_env": "Qwen_Key",
+    "model": "qwen3.7-flash-2026-07-15",
+    "output_dir": "qwen3.7-flash-2026-07-15",
     "auto_append_v1": false,
     "chat_completions_path": "/chat/completions"
   }

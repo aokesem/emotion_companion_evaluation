@@ -23,7 +23,7 @@ OPENAI_API_KEY=your-api-key
 
 `数据生成代码/pipeline_config.json`
 
-你可以在这里调整：
+可以在这里调整：
 
 - 默认模型名
 - temperature / max_tokens / timeout / retries / sleep
@@ -31,7 +31,6 @@ OPENAI_API_KEY=your-api-key
 - 四步 prompt 模板
 - 每一步的必需输出字段
 
-主脚本只负责执行，不再把 prompt 硬编码在代码里。
 
 ## 3. 运行
 默认读取：
@@ -75,4 +74,4 @@ python .\数据生成代码\generate_sim_user_pipeline.py --model deepseek-v4-pr
 3. 生活烦恼（主要烦恼、烦恼类别、表层话题、深层成因）
 4. 对话锚点（情绪状态、触发事件、开场方式、开场首句示例）
 
-每一步都会引用上一步结果，符合你定义的依赖链。
+

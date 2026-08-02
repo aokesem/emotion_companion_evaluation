@@ -37,9 +37,27 @@ OUTPUT_FIELDS = [
     "评估AI平均分",
 ]
 
+ALL_MODEL_OUTPUT_FIELDS = [
+    "模型名称",
+    "被理解感",
+    "情绪缓解感",
+    "个性化贴合度",
+    "交流舒适度",
+    "识别层评分",
+    "理解层评分",
+    "行动层评分",
+    "用户AI主观平均分",
+    "评估AI平均分",
+    "已测画像数",
+]
+
+DEFAULT_ALL_MODEL_OUTPUT = DEFAULT_OUTPUT_DIR / "all_model_score_summary.csv"
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="从 dialog_eval_summary.csv 提取精简评分 CSV")
+    parser.add_argument("--all", action="store_true", help="汇总 outputs 下所有模型实验目录的平均分")
+    parser.add_argument("--all-output", type=Path, default=None, help="全部模型总表；默认写入 outputs/all_model_score_summary.csv")
     parser.add_argument("--output-dir", type=str, default="", help="输出实验目录；相对路径默认位于 outputs/ 下")
     parser.add_argument("--input", type=Path, default=None, help="输入 summary CSV；默认由 output-dir 派生")
     parser.add_argument("--output", type=Path, default=None, help="输出精简评分 CSV；默认由 output-dir 派生")
@@ -54,6 +72,7 @@ def parse_args() -> argparse.Namespace:
         if args.score_summary_output is not None
         else output_dir / "dialog_eval_score_summary.json"
     )
+    args.all_output = resolve_path(args.all_output) if args.all_output is not None else DEFAULT_ALL_MODEL_OUTPUT
     return args
 
 def resolve_path(path: Path) -> Path:
@@ -196,8 +215,74 @@ def print_summary(summary: dict[str, float | int | None]) -> None:
         display = format_score(value) if isinstance(value, float) else value
         print(f"{label}: {display}")
 
+
+def extract_all_scores(rows: list[dict[str, str]], source: Path) -> list[dict[str, float | None]]:
+    score_rows: list[dict[str, float | None]] = []
+    for index, row in enumerate(rows, start=1):
+        try:
+            _, scores = extract_score_row(row, index)
+        except ValueError as exc:
+            raise ValueError(f"处理 {source} 失败: {exc}") from exc
+        score_rows.append(scores)
+    return score_rows
+
+
+def all_model_summary_row(model_name: str, score_rows: list[dict[str, float | None]]) -> dict[str, str | int]:
+    summary = score_summary(score_rows)
+    user_dimensions = [
+        summary["被理解感均值"],
+        summary["情绪缓解感均值"],
+        summary["个性化贴合度均值"],
+        summary["交流舒适度均值"],
+    ]
+    evaluator_dimensions = [
+        summary["识别层评分均值"],
+        summary["理解层评分均值"],
+        summary["行动层评分均值"],
+    ]
+    return {
+        "模型名称": model_name,
+        "被理解感": format_score(summary["被理解感均值"]),
+        "情绪缓解感": format_score(summary["情绪缓解感均值"]),
+        "个性化贴合度": format_score(summary["个性化贴合度均值"]),
+        "交流舒适度": format_score(summary["交流舒适度均值"]),
+        "识别层评分": format_score(summary["识别层评分均值"]),
+        "理解层评分": format_score(summary["理解层评分均值"]),
+        "行动层评分": format_score(summary["行动层评分均值"]),
+        "用户AI主观平均分": format_score(average(user_dimensions)),
+        "评估AI平均分": format_score(average(evaluator_dimensions)),
+        "已测画像数": len(score_rows),
+    }
+
+
+def run_all(output_path: Path) -> None:
+    model_rows: list[dict[str, str | int]] = []
+    for model_dir in sorted(DEFAULT_OUTPUT_DIR.iterdir(), key=lambda path: path.name.casefold()):
+        if not model_dir.is_dir() or model_dir.name.casefold() == "manual":
+            continue
+        summary_path = model_dir / "dialog_eval_summary.csv"
+        if not summary_path.is_file():
+            print(f"跳过（缺少 dialog_eval_summary.csv）: {model_dir.name}")
+            continue
+        rows = read_summary_rows(summary_path)
+        scores = extract_all_scores(rows, summary_path)
+        model_rows.append(all_model_summary_row(model_dir.name, scores))
+        print(f"已汇总: {model_dir.name}（{len(scores)} 条）")
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with output_path.open("w", encoding="utf-8-sig", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=ALL_MODEL_OUTPUT_FIELDS)
+        writer.writeheader()
+        writer.writerows(model_rows)
+    print(f"全部模型总表: {output_path}")
+    print(f"模型数: {len(model_rows)}")
+
 def main() -> None:
     args = parse_args()
+    if args.all:
+        run_all(args.all_output)
+        return
+
     rows = read_summary_rows(args.input)
     output_rows: list[dict[str, str]] = []
     score_rows: list[dict[str, float | None]] = []

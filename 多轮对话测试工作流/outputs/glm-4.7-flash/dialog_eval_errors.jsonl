@@ -1,2 +1,52 @@
 {"ID": "57457126001", "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-01T15:44:01"}
 {"ID": "57457126001", "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-01T15:47:20"}
+{"ID": "75376243001", "sample_pick_order": 2, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-25T13:06:12"}
+{"ID": "324078110002", "sample_pick_order": 3, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-25T13:08:59"}
+{"ID": "111154127001", "sample_pick_order": 6, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-25T13:16:04"}
+{"ID": "338231328001", "sample_pick_order": 7, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-25T13:16:30"}
+{"ID": "51606117001", "sample_pick_order": 8, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-25T13:19:02"}
+{"ID": "324045114001", "sample_pick_order": 9, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-25T13:23:19"}
+{"ID": "18206219002", "sample_pick_order": 10, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-25T13:23:45"}
+{"ID": "281104130001", "sample_pick_order": 13, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1302\",\"message\":\"您的账户已达到速率限制，请您控制请求频率\"}}", "created_at": "2026-07-25T13:36:02"}
+{"ID": "134902123001", "sample_pick_order": 14, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1302\",\"message\":\"您的账户已达到速率限制，请您控制请求频率\"}}", "created_at": "2026-07-25T13:36:08"}
+{"ID": "122490220001", "sample_pick_order": 15, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1302\",\"message\":\"您的账户已达到速率限制，请您控制请求频率\"}}", "created_at": "2026-07-25T13:36:15"}
+{"ID": "56302330002", "sample_pick_order": 16, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-25T13:36:21"}
+{"ID": "75504213002", "sample_pick_order": 18, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1302\",\"message\":\"您的账户已达到速率限制，请您控制请求频率\"}}", "created_at": "2026-07-25T13:45:13"}
+{"ID": "184037213001", "sample_pick_order": 19, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1302\",\"message\":\"您的账户已达到速率限制，请您控制请求频率\"}}", "created_at": "2026-07-25T13:45:19"}
+{"ID": "266059222001", "sample_pick_order": 23, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-25T14:01:24"}
+{"ID": "30476124001", "sample_pick_order": 24, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-25T14:03:32"}
+{"ID": "135559225002", "sample_pick_order": 25, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-25T14:05:56"}
+{"ID": "280154309002", "sample_pick_order": 28, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-25T14:17:07"}
+{"ID": "34043224002", "sample_pick_order": 30, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-25T14:23:36"}
+{"ID": "105102306002", "sample_pick_order": 32, "error": "模型返回 JSON 解析失败，且自动修复失败。首次错误: 模型返回非 JSON 对象: ; 修复错误: 模型返回非 JSON 对象: ; 原始输出片段: ; 修复输出片段: ", "created_at": "2026-07-25T14:34:05"}
+{"ID": "134902216001", "sample_pick_order": 33, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-25T14:35:44"}
+{"ID": "211176105002", "sample_pick_order": 34, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-25T14:38:06"}
+{"ID": "241116202002", "sample_pick_order": 35, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-25T14:38:30"}
+{"ID": "64028314002", "sample_pick_order": 37, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1302\",\"message\":\"您的账户已达到速率限制，请您控制请求频率\"}}", "created_at": "2026-07-25T14:47:02"}
+{"ID": "266306205002", "sample_pick_order": 38, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1302\",\"message\":\"您的账户已达到速率限制，请您控制请求频率\"}}", "created_at": "2026-07-25T14:47:08"}
+{"ID": "57633243002", "sample_pick_order": 39, "error": "模型返回 JSON 解析失败，且自动修复失败。首次错误: 模型返回非 JSON 对象: ; 修复错误: 模型返回非 JSON 对象: ; 原始输出片段: ; 修复输出片段: ", "created_at": "2026-07-25T14:53:27"}
+{"ID": "202454131002", "sample_pick_order": 40, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1302\",\"message\":\"您的账户已达到速率限制，请您控制请求频率\"}}", "created_at": "2026-07-25T14:57:45"}
+{"ID": "153859115002", "sample_pick_order": 41, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-25T14:58:38"}
+{"ID": "75376243001", "sample_pick_order": 2, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-31T11:47:18"}
+{"ID": "324078110002", "sample_pick_order": 3, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-31T11:49:10"}
+{"ID": "111154127001", "sample_pick_order": 6, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-31T11:50:55"}
+{"ID": "338231328001", "sample_pick_order": 7, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-31T11:51:01"}
+{"ID": "51606117001", "sample_pick_order": 8, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-31T11:51:08"}
+{"ID": "324045114001", "sample_pick_order": 9, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-31T11:54:21"}
+{"ID": "18206219002", "sample_pick_order": 10, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-31T11:54:27"}
+{"ID": "281104130001", "sample_pick_order": 13, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-31T11:55:45"}
+{"ID": "134902123001", "sample_pick_order": 14, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-31T11:55:51"}
+{"ID": "122490220001", "sample_pick_order": 15, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-31T11:55:58"}
+{"ID": "75504213002", "sample_pick_order": 18, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-31T12:02:02"}
+{"ID": "184037213001", "sample_pick_order": 19, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-31T12:04:10"}
+{"ID": "266059222001", "sample_pick_order": 23, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-31T12:04:36"}
+{"ID": "30476124001", "sample_pick_order": 24, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-31T12:04:43"}
+{"ID": "135559225002", "sample_pick_order": 25, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-31T12:05:11"}
+{"ID": "280154309002", "sample_pick_order": 28, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-31T12:05:18"}
+{"ID": "34043224002", "sample_pick_order": 30, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-31T12:06:26"}
+{"ID": "105102306002", "sample_pick_order": 32, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-31T12:07:53"}
+{"ID": "134902216001", "sample_pick_order": 33, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-31T12:12:57"}
+{"ID": "64028314002", "sample_pick_order": 37, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-31T12:24:13"}
+{"ID": "266306205002", "sample_pick_order": 38, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-31T12:24:52"}
+{"ID": "57633243002", "sample_pick_order": 39, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-31T12:27:21"}
+{"ID": "158278201002", "sample_pick_order": 43, "error": "模型调用失败: HTTP 429: {\"error\":{\"code\":\"1305\",\"message\":\"该模型当前访问量过大，请您稍后再试\"}}", "created_at": "2026-07-31T12:41:45"}
