@@ -123,6 +123,39 @@ python .\多轮对话测试工作流\run_langgraph_workflow.py --ids 14643113001
 
 脚本会读取本目录下 `.env`，如果不存在，则继续尝试读取 `../数据生成代码/.env`。
 
+## 模拟用户与评估 AI 的双 API 模式
+
+默认的 `official` 模式保持原有行为：模拟用户 AI 和评估 AI 都调用 OpenAI 兼容接口，被测 AI 继续由 `--tested-profile` 决定。
+
+```powershell
+python .\多轮对话测试工作流\run_langgraph_workflow.py --aux-provider official --limit 1 --print-dialog
+```
+
+`lab` 模式只将模拟用户 AI 和评估 AI 切换到实验室工作流 API，被测 AI 不变。在 `.env` 中配置：
+
+```env
+LAB_SIMULATED_USER_TOKEN=模拟用户工作流Token
+LAB_EVALUATOR_TOKEN=评估工作流Token
+```
+
+实验室接口默认使用：
+
+```text
+https://ithink.isapientia.com/api/app/utv/v1/agent/qa
+```
+
+如需覆盖，可设置 `LAB_AGENT_API_URL` 或传入 `--lab-api-url`。运行示例：
+
+```powershell
+python .\多轮对话测试工作流\run_langgraph_workflow.py --aux-provider lab --limit 1 --print-dialog --continue-on-error
+```
+
+未显式指定 `--output-dir` 时，实验室模式会在被测 Profile 的输出目录后增加 `-lab`，避免与官方模式结果混合。成功记录的 `run_config` 会写入 `aux_provider`、`simulated_user_provider` 和 `evaluator_provider`。
+
+实验室工作流中的模型、temperature 和最大输出 token 由已发布工作流固定。代码仍使用原有提示词和完整消息历史，但不会把这三个参数重复传给实验室接口。
+
+由于实验室网关只把最后一条 `user` 消息传入工作流，实验室模式会将原有的 `system/user/assistant` 消息按角色和顺序序列化为一条完整输入。每次请求使用新的 `context_id` 和 `end_user`，对话记忆继续由 LangGraph 状态管理，不依赖实验室服务端持久化。适配器还会清理回复开头的 `<think>...</think>`，并将 HTTP 200 响应中的“工作流执行失败”视为调用错误。
+
 ## 手动被测模式
 
 使用 `--manual` 可以手动输入每轮被测 AI 回复。该模式固定完成设定轮数，默认输出到 `outputs/manual/`，只生成模拟用户主观评分，跳过被测 AI 事后总结和评估 AI 评分。

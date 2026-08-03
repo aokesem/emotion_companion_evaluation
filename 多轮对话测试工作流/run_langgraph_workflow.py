@@ -6,12 +6,13 @@ import argparse
 import csv
 import json
 import os
+import re
 import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Literal, TypedDict
+from typing import Any, Literal, Protocol, TypedDict
 
 import pandas as pd
 import requests
@@ -134,6 +135,30 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--tested-agent-api-key", type=str, default=os.getenv("TESTED_AGENT_API_KEY", ""), help="被测 AI API Key")
     parser.add_argument("--evaluator-base-url", type=str, default=os.getenv("EVALUATOR_BASE_URL", ""), help="评估 AI API Base URL")
     parser.add_argument("--evaluator-api-key", type=str, default=os.getenv("EVALUATOR_API_KEY", ""), help="评估 AI API Key")
+    parser.add_argument(
+        "--aux-provider",
+        choices=["official", "lab"],
+        default=defaults.get("aux_provider", "official"),
+        help="模拟用户和评估 AI 的 API 来源；被测 AI 不受影响",
+    )
+    parser.add_argument(
+        "--lab-api-url",
+        type=str,
+        default=os.getenv("LAB_AGENT_API_URL", "https://ithink.isapientia.com/api/app/utv/v1/agent/qa"),
+        help="实验室智能体非流式 API 地址",
+    )
+    parser.add_argument(
+        "--lab-simulated-user-token",
+        type=str,
+        default=os.getenv("LAB_SIMULATED_USER_TOKEN", ""),
+        help="实验室模拟用户工作流 Token",
+    )
+    parser.add_argument(
+        "--lab-evaluator-token",
+        type=str,
+        default=os.getenv("LAB_EVALUATOR_TOKEN", ""),
+        help="实验室评估工作流 Token",
+    )
     parser.add_argument("--temperature", type=float, default=defaults["temperature"], help="采样温度")
     parser.add_argument("--max-tokens", type=int, default=defaults["max_tokens"], help="每次回复最大 token")
     parser.add_argument("--timeout", type=int, default=defaults["timeout"], help="请求超时秒数")
@@ -149,7 +174,10 @@ def parse_args() -> argparse.Namespace:
 
     apply_tested_profile(args, defaults)
 
-    output_dir_text = args.output_dir or ("manual" if args.manual else args.profile_output_dir or paths.get("output_dir", "outputs"))
+    default_output_dir = "manual" if args.manual else args.profile_output_dir or paths.get("output_dir", "outputs")
+    if args.aux_provider == "lab" and not args.manual:
+        default_output_dir = f"{default_output_dir}-lab"
+    output_dir_text = args.output_dir or default_output_dir
     args.output_dir = resolve_output_dir(output_dir_text)
     args.success_jsonl = output_file_path(args.success_jsonl, paths["success_jsonl"], args.output_dir)
     args.summary_csv = output_file_path(args.summary_csv, paths["summary_csv"], args.output_dir)
@@ -310,13 +338,138 @@ class OpenAICompatClient:
         raise RuntimeError(f"模型调用失败: {last_err}")
 
 
+class ChatClient(Protocol):
+    def chat_text(self, model: str, messages: list[dict[str, str]], temperature: float, max_tokens: int) -> str: ...
+
+    def chat_json(
+        self,
+        model: str,
+        messages: list[dict[str, str]],
+        temperature: float,
+        max_tokens: int,
+    ) -> dict[str, Any]: ...
+
+
+def serialize_messages_for_lab(messages: list[dict[str, str]]) -> str:
+    """Flatten role-tagged history because the lab gateway forwards only the last user message."""
+    role_labels = {
+        "system": "系统消息（最高优先级）",
+        "user": "用户消息",
+        "assistant": "助手消息",
+    }
+    sections = [
+        "你正在接收由 API 兼容层序列化的聊天消息。",
+        "请严格遵守其中的系统消息，并将后续消息视为按顺序发生的完整对话历史。",
+        "请根据全部上下文回复最后一条用户消息，只输出本轮助手回复，不要解释消息格式。",
+    ]
+    for index, message in enumerate(messages, start=1):
+        role = str(message.get("role", "")).strip().lower()
+        content = str(message.get("content", ""))
+        label = role_labels.get(role, f"{role or '未知'}消息")
+        sections.append(f"\n===== 第 {index} 条：{label} =====\n{content}")
+    return "\n".join(sections)
+
+
+def strip_leading_think_block(content: str) -> str:
+    """Remove reasoning leaked by the lab model while keeping the final answer unchanged."""
+    return re.sub(r"^\s*<think>.*?</think>\s*", "", content, count=1, flags=re.IGNORECASE | re.DOTALL)
+
+
+class LabAgentClient:
+    """Adapter for the lab workflow API while preserving local message construction."""
+
+    def __init__(self, api_url: str, token: str, timeout: int, retries: int, debug_http: bool = False):
+        self.api_url = api_url.strip()
+        self.token = token
+        self.timeout = timeout
+        self.retries = retries
+        self.debug_http = debug_http
+        self.session = requests.Session()
+
+    def chat_text(self, model: str, messages: list[dict[str, str]], temperature: float, max_tokens: int) -> str:
+        del model, temperature, max_tokens  # These are fixed in the published lab workflow.
+        return self._chat(messages).strip()
+
+    def chat_json(
+        self,
+        model: str,
+        messages: list[dict[str, str]],
+        temperature: float,
+        max_tokens: int,
+    ) -> dict[str, Any]:
+        content = self.chat_text(model, messages, temperature, max_tokens)
+        try:
+            return parse_json_content(content)
+        except Exception as first_error:  # noqa: BLE001
+            repair_messages = [
+                {
+                    "role": "system",
+                    "content": "你是 JSON 修复器。请只输出一个合法 JSON 对象，不要输出 markdown，不要解释，不要增删字段含义。",
+                },
+                {
+                    "role": "user",
+                    "content": "下面内容本应是 JSON 对象，但格式可能有错误。请修复为合法 JSON 对象，保留原始语义：\n" + content,
+                },
+            ]
+            repaired = self._chat(repair_messages)
+            try:
+                return parse_json_content(repaired)
+            except Exception as repair_error:  # noqa: BLE001
+                raw_preview = content.strip().replace("\n", " ")[:500]
+                repair_preview = repaired.strip().replace("\n", " ")[:500]
+                raise ValueError(
+                    "实验室智能体返回 JSON 解析失败，且自动修复失败。"
+                    f"首次错误: {first_error}; 修复错误: {repair_error}; "
+                    f"原始输出片段: {raw_preview}; 修复输出片段: {repair_preview}"
+                ) from repair_error
+
+    def _chat(self, messages: list[dict[str, str]]) -> str:
+        request_id = uuid.uuid4().hex
+        serialized_messages = serialize_messages_for_lab(messages)
+        payload = {
+            "messages": [{"role": "user", "content": serialized_messages}],
+            "inputs": {},
+            "context_id": request_id,
+            "end_user": f"eval-{request_id[:24]}",
+            "stream": False,
+        }
+        headers = {
+            "Authorization": f"Token {self.token}",
+            "Content-Type": "application/json",
+        }
+        last_err: Exception | None = None
+        for attempt in range(1, self.retries + 1):
+            try:
+                resp = self.session.post(self.api_url, headers=headers, json=payload, timeout=self.timeout)
+                if self.debug_http:
+                    print(f"[LAB HTTP] POST {self.api_url}")
+                    print(f"[LAB HTTP] status={resp.status_code} body[:500]={resp.text[:500]}")
+                if resp.status_code >= 400:
+                    raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:500]}")
+                data = resp.json()
+                answer = data.get("data", {}).get("answer")
+                if not isinstance(answer, str):
+                    raise ValueError(f"实验室智能体响应缺少 data.answer: {resp.text[:500]}")
+                if "工作流执行失败" in answer:
+                    raise RuntimeError(f"实验室工作流执行失败: {answer[:500]}")
+                cleaned_answer = strip_leading_think_block(answer).strip()
+                if not cleaned_answer:
+                    raise ValueError("实验室智能体清理思考过程后未返回有效回答")
+                return cleaned_answer
+            except Exception as exc:  # noqa: BLE001
+                last_err = exc
+                if attempt < self.retries:
+                    time.sleep(min(2**attempt, 8))
+        raise RuntimeError(f"实验室智能体调用失败: {last_err}")
+
+
 @dataclass
 class WorkflowContext:
     args: argparse.Namespace
     prompt_paths: dict[str, Path]
-    simulated_user_client: OpenAICompatClient | None
-    tested_agent_client: OpenAICompatClient | None
-    evaluator_client: OpenAICompatClient | None
+    simulated_user_client: ChatClient | None
+    tested_agent_client: ChatClient | None
+    evaluator_client: ChatClient | None
 
     def prompt(self, name: str, **kwargs: str) -> str:
         path = self.prompt_paths[name]
@@ -448,6 +601,9 @@ def success_result(state: WorkflowState, args: argparse.Namespace) -> dict[str, 
         "turns": state["max_turns"],
         "run_config": {
             "tested_agent_mode": "manual" if args.manual else "openai",
+            "aux_provider": args.aux_provider,
+            "simulated_user_provider": args.aux_provider,
+            "evaluator_provider": "" if args.manual else args.aux_provider,
             "tested_profile": args.tested_profile if not args.manual else "",
             "simulated_user_model": args.simulated_user_model,
             "tested_agent_model": "manual" if args.manual else args.tested_agent_model,
@@ -677,31 +833,28 @@ def ensure_files(args: argparse.Namespace, prompt_paths: dict[str, Path]) -> Non
 
 
 def role_credentials(args: argparse.Namespace) -> dict[str, dict[str, Any]]:
-    credentials = {
-        "simulated_user": {
+    credentials: dict[str, dict[str, Any]] = {}
+    if args.aux_provider == "official":
+        credentials["simulated_user"] = {
             "base_url": args.simulated_user_base_url or args.base_url,
             "api_key": args.simulated_user_api_key or args.api_key,
             "auto_append_v1": True,
             "chat_completions_path": "/chat/completions",
         }
-    }
     if not args.manual:
-        credentials.update(
-            {
-                "tested_agent": {
-                    "base_url": args.tested_agent_base_url or args.base_url,
-                    "api_key": args.tested_agent_api_key or args.api_key,
-                    "auto_append_v1": args.tested_agent_auto_append_v1,
-                    "chat_completions_path": args.tested_agent_chat_completions_path,
-                },
-                "evaluator": {
-                    "base_url": args.evaluator_base_url or args.base_url,
-                    "api_key": args.evaluator_api_key or args.api_key,
-                    "auto_append_v1": True,
-                    "chat_completions_path": "/chat/completions",
-                },
+        credentials["tested_agent"] = {
+            "base_url": args.tested_agent_base_url or args.base_url,
+            "api_key": args.tested_agent_api_key or args.api_key,
+            "auto_append_v1": args.tested_agent_auto_append_v1,
+            "chat_completions_path": args.tested_agent_chat_completions_path,
+        }
+        if args.aux_provider == "official":
+            credentials["evaluator"] = {
+                "base_url": args.evaluator_base_url or args.base_url,
+                "api_key": args.evaluator_api_key or args.api_key,
+                "auto_append_v1": True,
+                "chat_completions_path": "/chat/completions",
             }
-        )
     missing = [name for name, config in credentials.items() if not config["base_url"] or not config["api_key"]]
     if missing:
         raise ValueError(
@@ -709,12 +862,22 @@ def role_credentials(args: argparse.Namespace) -> dict[str, dict[str, Any]]:
             + ", ".join(missing)
             + "。可设置角色专用参数/环境变量，或设置通用 OPENAI_BASE_URL 与 OPENAI_API_KEY。"
         )
+    if args.aux_provider == "lab":
+        missing_lab = []
+        if not args.lab_api_url:
+            missing_lab.append("LAB_AGENT_API_URL")
+        if not args.lab_simulated_user_token:
+            missing_lab.append("LAB_SIMULATED_USER_TOKEN")
+        if not args.manual and not args.lab_evaluator_token:
+            missing_lab.append("LAB_EVALUATOR_TOKEN")
+        if missing_lab:
+            raise ValueError("缺少实验室 API 配置: " + ", ".join(missing_lab))
     return credentials
 
 
-def create_clients(args: argparse.Namespace) -> dict[str, OpenAICompatClient]:
+def create_clients(args: argparse.Namespace) -> dict[str, ChatClient]:
     credentials = role_credentials(args)
-    return {
+    clients: dict[str, ChatClient] = {
         name: OpenAICompatClient(
             config["base_url"],
             config["api_key"],
@@ -726,6 +889,23 @@ def create_clients(args: argparse.Namespace) -> dict[str, OpenAICompatClient]:
         )
         for name, config in credentials.items()
     }
+    if args.aux_provider == "lab":
+        clients["simulated_user"] = LabAgentClient(
+            args.lab_api_url,
+            args.lab_simulated_user_token,
+            args.timeout,
+            args.retries,
+            args.debug_http,
+        )
+        if not args.manual:
+            clients["evaluator"] = LabAgentClient(
+                args.lab_api_url,
+                args.lab_evaluator_token,
+                args.timeout,
+                args.retries,
+                args.debug_http,
+            )
+    return clients
 
 
 def prompt_paths_from_config() -> dict[str, Path]:
@@ -778,6 +958,7 @@ def run(args: argparse.Namespace) -> None:
     print(f"模拟用户信息: {args.sim_user_jsonl}")
     print(f"输出目录: {args.output_dir}")
     print(f"被测模式: {'manual' if args.manual else 'openai'}")
+    print(f"模拟用户/评估 API: {args.aux_provider}")
     if not args.manual:
         print(f"被测 profile: {args.tested_profile or '未指定'}")
         print(f"被测模型: {args.tested_agent_model}")

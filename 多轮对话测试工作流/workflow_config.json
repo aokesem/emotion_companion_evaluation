@@ -8,6 +8,7 @@
                      "sleep":  0.0,
                      "temperature":  0.2,
                      "max_tokens":  10000,
+                     "aux_provider":  "official",
                      "simulated_user_model":  "deepseek-v4-pro",
                      "tested_profile":  "deepseek_v4_pro",
                      "evaluator_model":  "deepseek-v4-pro"

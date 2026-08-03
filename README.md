@@ -28,6 +28,10 @@ python .\多轮对话测试工作流\run_langgraph_workflow.py --tested-profile 
 
 --continue-on-error：在某条报错后不停止，继续运行。
 
+--aux-provider lab 将用户AI与评估AI改为清华ithink平台api
+
+--output-dir 指定输出目录
+
 每个 profile 会自动输出到自己的目录。
 
 
