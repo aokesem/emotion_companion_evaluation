@@ -150,11 +150,61 @@ https://ithink.isapientia.com/api/app/utv/v1/agent/qa
 python .\多轮对话测试工作流\run_langgraph_workflow.py --aux-provider lab --limit 1 --print-dialog --continue-on-error
 ```
 
-未显式指定 `--output-dir` 时，实验室模式会在被测 Profile 的输出目录后增加 `-lab`，避免与官方模式结果混合。成功记录的 `run_config` 会写入 `aux_provider`、`simulated_user_provider` 和 `evaluator_provider`。
+在确认 Lab 的序列化消息格式会抬高最终主观评分后，推荐使用新的 `--lab` 混合省费模式：模拟用户的多轮对话和评估 AI 使用 Lab，只有对话结束后的用户主观评分使用 Official 原生消息格式。对话上下文由 LangGraph 本地状态完整传递，不依赖 Lab 服务端会话。
+
+```powershell
+python .\多轮对话测试工作流\run_langgraph_workflow.py `
+  --lab `
+  --tested-profile deepseek_v4_pro `
+  --output-dir deepseek_v4_pro-lab-hybrid `
+  --limit 1 `
+  --print-dialog `
+  --continue-on-error
+```
+
+`--lab` 与旧的 `--aux-provider lab` 含义不同：
+
+- `--lab`：Lab 模拟用户对话 + Official 主观评分 + Lab 评估 AI。
+- `--aux-provider lab`：模拟用户对话、主观评分和评估 AI 全部使用 Lab，保留用于复现旧实验。
+
+未显式指定 `--output-dir` 时，全 Lab 模式会增加 `-lab`，新的混合模式会增加 `-lab-hybrid`。成功记录的 `run_config` 会分别写入 `simulated_user_provider`、`subjective_rating_provider` 和 `evaluator_provider`。
 
 实验室工作流中的模型、temperature 和最大输出 token 由已发布工作流固定。代码仍使用原有提示词和完整消息历史，但不会把这三个参数重复传给实验室接口。
 
 由于实验室网关只把最后一条 `user` 消息传入工作流，实验室模式会将原有的 `system/user/assistant` 消息按角色和顺序序列化为一条完整输入。每次请求使用新的 `context_id` 和 `end_user`，对话记忆继续由 LangGraph 状态管理，不依赖实验室服务端持久化。适配器还会清理回复开头的 `<think>...</think>`，并将 HTTP 200 响应中的“工作流执行失败”视为调用错误。
+
+## 固定对话主观评分交叉实验
+
+`rescore_subjective_ratings.py` 不重新生成对话，而是将同一批 Official/Lab 对话分别交给三种评分条件：
+
+- `official-native`：Official API 使用原生 `system/assistant/user` 消息。
+- `official-serialized`：Official API 使用与 Lab 相同的单条序列化 `user` 消息。
+- `lab-serialized`：Lab API 使用单条序列化 `user` 消息。
+
+先确认配对样本：
+
+```powershell
+python .\多轮对话测试工作流\rescore_subjective_ratings.py `
+  --official-input-dir deepseek_v4_pro-official-paired `
+  --lab-input-dir deepseek_v4_pro `
+  --start-pick-order 172 `
+  --end-pick-order 199 `
+  --dry-run
+```
+
+正式评分：
+
+```powershell
+python .\多轮对话测试工作流\rescore_subjective_ratings.py `
+  --official-input-dir deepseek_v4_pro-official-paired `
+  --lab-input-dir deepseek_v4_pro `
+  --output-dir deepseek_v4_pro-subjective-cross-rescore `
+  --start-pick-order 172 `
+  --end-pick-order 199 `
+  --continue-on-error
+```
+
+脚本支持断点续跑，已成功的“对话来源 + 评分条件 + `sample_pick_order`”组合会自动跳过。结果、错误和六组均值分别写入 `subjective_rescore_runs.jsonl`、`subjective_rescore_errors.jsonl` 和 `subjective_rescore_summary.csv`。`--max-tokens` 只控制 Official API；Lab 的最大输出 token 仍由已发布工作流固定。
 
 ## 手动被测模式
 

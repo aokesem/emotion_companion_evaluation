@@ -142,6 +142,11 @@ def parse_args() -> argparse.Namespace:
         help="模拟用户和评估 AI 的 API 来源；被测 AI 不受影响",
     )
     parser.add_argument(
+        "--lab",
+        action="store_true",
+        help="混合省费模式：模拟用户对话和评估 AI 使用 Lab，最终主观评分使用 Official",
+    )
+    parser.add_argument(
         "--lab-api-url",
         type=str,
         default=os.getenv("LAB_AGENT_API_URL", "https://ithink.isapientia.com/api/app/utv/v1/agent/qa"),
@@ -173,9 +178,12 @@ def parse_args() -> argparse.Namespace:
     args = parser.parse_args()
 
     apply_tested_profile(args, defaults)
+    apply_provider_mode(args)
 
     default_output_dir = "manual" if args.manual else args.profile_output_dir or paths.get("output_dir", "outputs")
-    if args.aux_provider == "lab" and not args.manual:
+    if args.provider_mode == "lab-hybrid" and not args.manual:
+        default_output_dir = f"{default_output_dir}-lab-hybrid"
+    elif args.aux_provider == "lab" and not args.manual:
         default_output_dir = f"{default_output_dir}-lab"
     output_dir_text = args.output_dir or default_output_dir
     args.output_dir = resolve_output_dir(output_dir_text)
@@ -183,6 +191,20 @@ def parse_args() -> argparse.Namespace:
     args.summary_csv = output_file_path(args.summary_csv, paths["summary_csv"], args.output_dir)
     args.error_jsonl = output_file_path(args.error_jsonl, paths["error_jsonl"], args.output_dir)
     return args
+
+
+def apply_provider_mode(args: argparse.Namespace) -> None:
+    """Resolve role-specific providers while keeping --aux-provider backward compatible."""
+    if args.lab:
+        args.provider_mode = "lab-hybrid"
+        args.simulated_user_provider = "lab"
+        args.subjective_rating_provider = "official"
+        args.evaluator_provider = "" if args.manual else "lab"
+        return
+    args.provider_mode = args.aux_provider
+    args.simulated_user_provider = args.aux_provider
+    args.subjective_rating_provider = args.aux_provider
+    args.evaluator_provider = "" if args.manual else args.aux_provider
 
 
 def apply_tested_profile(args: argparse.Namespace, defaults: dict[str, Any]) -> None:
@@ -468,6 +490,7 @@ class WorkflowContext:
     args: argparse.Namespace
     prompt_paths: dict[str, Path]
     simulated_user_client: ChatClient | None
+    subjective_rating_client: ChatClient | None
     tested_agent_client: ChatClient | None
     evaluator_client: ChatClient | None
 
@@ -601,9 +624,10 @@ def success_result(state: WorkflowState, args: argparse.Namespace) -> dict[str, 
         "turns": state["max_turns"],
         "run_config": {
             "tested_agent_mode": "manual" if args.manual else "openai",
-            "aux_provider": args.aux_provider,
-            "simulated_user_provider": args.aux_provider,
-            "evaluator_provider": "" if args.manual else args.aux_provider,
+            "aux_provider": args.provider_mode,
+            "simulated_user_provider": args.simulated_user_provider,
+            "subjective_rating_provider": args.subjective_rating_provider,
+            "evaluator_provider": args.evaluator_provider,
             "tested_profile": args.tested_profile if not args.manual else "",
             "simulated_user_model": args.simulated_user_model,
             "tested_agent_model": "manual" if args.manual else args.tested_agent_model,
@@ -636,9 +660,10 @@ def append_summary_csv(path: Path, state: WorkflowState) -> None:
 
 
 def build_graph(ctx: WorkflowContext):
-    if ctx.simulated_user_client is None:
+    if ctx.simulated_user_client is None or ctx.subjective_rating_client is None:
         raise ValueError("dry-run 模式不需要构建可执行 graph")
     simulated_user_client = ctx.simulated_user_client
+    subjective_rating_client = ctx.subjective_rating_client
     tested_agent_client = ctx.tested_agent_client
     evaluator_client = ctx.evaluator_client
     args = ctx.args
@@ -728,7 +753,7 @@ def build_graph(ctx: WorkflowContext):
             dialog_transcript=transcript_text(state["dialog_messages"]),
             dialog_messages_json=json.dumps(state["dialog_messages"], ensure_ascii=False, indent=2),
         )
-        rating = simulated_user_client.chat_json(
+        rating = subjective_rating_client.chat_json(
             model=args.simulated_user_model,
             messages=state["simulated_user_messages"] + [{"role": "user", "content": prompt}],
             temperature=args.temperature,
@@ -834,12 +859,19 @@ def ensure_files(args: argparse.Namespace, prompt_paths: dict[str, Path]) -> Non
 
 def role_credentials(args: argparse.Namespace) -> dict[str, dict[str, Any]]:
     credentials: dict[str, dict[str, Any]] = {}
-    if args.aux_provider == "official":
+    official_simulated_user = {
+        "base_url": args.simulated_user_base_url or args.base_url,
+        "api_key": args.simulated_user_api_key or args.api_key,
+        "auto_append_v1": True,
+        "chat_completions_path": "/chat/completions",
+    }
+    if args.simulated_user_provider == "official":
         credentials["simulated_user"] = {
-            "base_url": args.simulated_user_base_url or args.base_url,
-            "api_key": args.simulated_user_api_key or args.api_key,
-            "auto_append_v1": True,
-            "chat_completions_path": "/chat/completions",
+            **official_simulated_user,
+        }
+    if args.subjective_rating_provider == "official":
+        credentials["subjective_rating"] = {
+            **official_simulated_user,
         }
     if not args.manual:
         credentials["tested_agent"] = {
@@ -848,7 +880,7 @@ def role_credentials(args: argparse.Namespace) -> dict[str, dict[str, Any]]:
             "auto_append_v1": args.tested_agent_auto_append_v1,
             "chat_completions_path": args.tested_agent_chat_completions_path,
         }
-        if args.aux_provider == "official":
+        if args.evaluator_provider == "official":
             credentials["evaluator"] = {
                 "base_url": args.evaluator_base_url or args.base_url,
                 "api_key": args.evaluator_api_key or args.api_key,
@@ -862,13 +894,20 @@ def role_credentials(args: argparse.Namespace) -> dict[str, dict[str, Any]]:
             + ", ".join(missing)
             + "。可设置角色专用参数/环境变量，或设置通用 OPENAI_BASE_URL 与 OPENAI_API_KEY。"
         )
-    if args.aux_provider == "lab":
+    if "lab" in {
+        args.simulated_user_provider,
+        args.subjective_rating_provider,
+        args.evaluator_provider,
+    }:
         missing_lab = []
         if not args.lab_api_url:
             missing_lab.append("LAB_AGENT_API_URL")
-        if not args.lab_simulated_user_token:
+        if (
+            args.simulated_user_provider == "lab"
+            or args.subjective_rating_provider == "lab"
+        ) and not args.lab_simulated_user_token:
             missing_lab.append("LAB_SIMULATED_USER_TOKEN")
-        if not args.manual and not args.lab_evaluator_token:
+        if args.evaluator_provider == "lab" and not args.lab_evaluator_token:
             missing_lab.append("LAB_EVALUATOR_TOKEN")
         if missing_lab:
             raise ValueError("缺少实验室 API 配置: " + ", ".join(missing_lab))
@@ -889,7 +928,7 @@ def create_clients(args: argparse.Namespace) -> dict[str, ChatClient]:
         )
         for name, config in credentials.items()
     }
-    if args.aux_provider == "lab":
+    if args.simulated_user_provider == "lab":
         clients["simulated_user"] = LabAgentClient(
             args.lab_api_url,
             args.lab_simulated_user_token,
@@ -897,14 +936,22 @@ def create_clients(args: argparse.Namespace) -> dict[str, ChatClient]:
             args.retries,
             args.debug_http,
         )
-        if not args.manual:
-            clients["evaluator"] = LabAgentClient(
-                args.lab_api_url,
-                args.lab_evaluator_token,
-                args.timeout,
-                args.retries,
-                args.debug_http,
-            )
+    if args.subjective_rating_provider == "lab":
+        clients["subjective_rating"] = clients.get("simulated_user") or LabAgentClient(
+            args.lab_api_url,
+            args.lab_simulated_user_token,
+            args.timeout,
+            args.retries,
+            args.debug_http,
+        )
+    if args.evaluator_provider == "lab":
+        clients["evaluator"] = LabAgentClient(
+            args.lab_api_url,
+            args.lab_evaluator_token,
+            args.timeout,
+            args.retries,
+            args.debug_http,
+        )
     return clients
 
 
@@ -958,7 +1005,10 @@ def run(args: argparse.Namespace) -> None:
     print(f"模拟用户信息: {args.sim_user_jsonl}")
     print(f"输出目录: {args.output_dir}")
     print(f"被测模式: {'manual' if args.manual else 'openai'}")
-    print(f"模拟用户/评估 API: {args.aux_provider}")
+    print(f"模拟用户对话 API: {args.simulated_user_provider}")
+    print(f"主观评分 API: {args.subjective_rating_provider}")
+    if not args.manual:
+        print(f"评估 AI API: {args.evaluator_provider}")
     if not args.manual:
         print(f"被测 profile: {args.tested_profile or '未指定'}")
         print(f"被测模型: {args.tested_agent_model}")
@@ -986,6 +1036,7 @@ def run(args: argparse.Namespace) -> None:
         args=args,
         prompt_paths=prompt_paths,
         simulated_user_client=clients["simulated_user"],
+        subjective_rating_client=clients["subjective_rating"],
         tested_agent_client=clients.get("tested_agent"),
         evaluator_client=clients.get("evaluator"),
     )
