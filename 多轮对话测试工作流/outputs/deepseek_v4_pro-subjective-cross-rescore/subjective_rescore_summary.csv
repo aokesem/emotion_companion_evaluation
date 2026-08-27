@@ -1,7 +1,0 @@
-﻿dialog_source,rating_condition,count,被理解感,情绪缓解感,个性化贴合度,交流舒适度,四项平均
-lab-dialog,lab-serialized,28,2.071429,2.214286,2.142857,2.357143,2.196429
-lab-dialog,official-native,28,1.392857,1.607143,1.678571,1.892857,1.642857
-lab-dialog,official-serialized,28,2.071429,2.071429,2.285714,2.464286,2.223214
-official-dialog,lab-serialized,28,2.107143,2.178571,2.214286,2.392857,2.223214
-official-dialog,official-native,27,1.555556,1.629630,1.814815,2.000000,1.750000
-official-dialog,official-serialized,28,2.178571,2.142857,2.250000,2.392857,2.241071

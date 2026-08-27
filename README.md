@@ -12,7 +12,7 @@ extract_eval_scores.py，运行该文件，从结果中提取精简评分表和�
 
 使用以下命令开始对被测模型测试：
 
-python .\多轮对话测试工作流\run_langgraph_workflow.py --tested-profile glm-4-plus  --start 0 --limit 100 --turns 10 --print-dialog --continue-on-error      
+python .\多轮对话测试工作流\run_langgraph_workflow.py --tested-profile glm-4-plus  --start 0 --limit 100 --turns 10 --print-dialog --continue-on-error  
 
 参数说明：
 
@@ -29,6 +29,8 @@ python .\多轮对话测试工作流\run_langgraph_workflow.py --tested-profile 
 --continue-on-error：在某条报错后不停止，继续运行。
 
 --lab 将用户AI改为清华ithink平台api 
+
+--openrouter 将用户AI和评估AI的来源改为openrouter
 
 --output-dir 指定输出目录
 

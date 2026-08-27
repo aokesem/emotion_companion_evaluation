@@ -63,6 +63,14 @@
     "auto_append_v1": false,
     "chat_completions_path": "/chat/completions"
   },
+  "kimi-k2.6": {
+    "base_url": "https://api.moonshot.cn/v1",
+    "api_key_env": "Kimi_Key",
+    "model": "kimi-k2.6",
+    "output_dir": "kimi-k2.6",
+    "auto_append_v1": false,
+    "chat_completions_path": "/chat/completions"
+  },
   "doubao-seed-character-260628": {
     "base_url": "https://ark.cn-beijing.volces.com/api/v3",
     "api_key_env": "Doubao_Key",

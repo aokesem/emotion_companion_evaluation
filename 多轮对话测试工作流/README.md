@@ -131,6 +131,31 @@ python .\多轮对话测试工作流\run_langgraph_workflow.py --ids 14643113001
 python .\多轮对话测试工作流\run_langgraph_workflow.py --aux-provider official --limit 1 --print-dialog
 ```
 
+### OpenRouter 模式
+
+`--openrouter` 会将模拟用户对话、对话结束后的用户主观评分和评估 AI 全部切换到 OpenRouter；被测 AI 仍由 `--tested-profile` 决定，不会被切换。在 `.env` 中加入：
+
+```env
+OPENROUTER_API_KEY=你的OpenRouter密钥
+OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+OPENROUTER_DEEPSEEK_MODEL=deepseek/deepseek-v4-pro
+```
+
+其中 `OPENROUTER_DEEPSEEK_MODEL` 必须填写 OpenRouter 模型页面显示的实际模型 ID。如果该平台上的 V4 Pro ID 不同，只修改此项即可。
+
+运行一个样本进行连通性测试：
+
+```powershell
+python .\多轮对话测试工作流\run_langgraph_workflow.py `
+  --openrouter `
+  --tested-profile deepseek_v4_pro `
+  --limit 1 `
+  --print-dialog `
+  --continue-on-error
+```
+
+未指定 `--output-dir` 时，结果自动写入被测模型目录名加 `-openrouter` 后缀，避免混入 Official 数据。切回原 Official API 时去掉 `--openrouter` 即可；也可以显式传入 `--aux-provider official`。
+
 `lab` 模式只将模拟用户 AI 和评估 AI 切换到实验室工作流 API，被测 AI 不变。在 `.env` 中配置：
 
 ```env

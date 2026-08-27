@@ -1,0 +1,24 @@
+{
+  "生成时间": "2026-08-14T11:39:31",
+  "模型名单来源": "D:\\代码_精神慰藉agent评估\\多轮对话测试工作流\\outputs\\all_model_score_summary copy.csv",
+  "模型名单": [
+    "deepseek_v4_flash",
+    "deepseek_v4_pro",
+    "doubao-seed-2-0-lite-260428",
+    "doubao-seed-2-0-mini-260428",
+    "doubao-seed-character-260628",
+    "glm-4-plus",
+    "glm-5-2-260617",
+    "moonshot-v1-8k"
+  ],
+  "逐条评分来源": "D:\\代码_精神慰藉agent评估\\多轮对话测试工作流\\outputs\\<模型名称>\\dialog_eval_summary.csv",
+  "有效对话记录数": 2189,
+  "唯一用户ID数": 442,
+  "标准差": "逐条有效对话分数的样本标准差（ddof=1）",
+  "置信区间": "按用户ID聚类的 percentile bootstrap，95.0% CI",
+  "bootstrap次数": 5000,
+  "随机种子": 20260814,
+  "主观平均分": "仅在单条对话四项主观指标均完整时取算术平均",
+  "评估端平均分": "仅在单条对话识别、理解、行动三项均完整时取算术平均",
+  "跳过记录数": 0
+}

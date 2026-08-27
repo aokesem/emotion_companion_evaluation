@@ -136,6 +136,26 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--evaluator-base-url", type=str, default=os.getenv("EVALUATOR_BASE_URL", ""), help="评估 AI API Base URL")
     parser.add_argument("--evaluator-api-key", type=str, default=os.getenv("EVALUATOR_API_KEY", ""), help="评估 AI API Key")
     parser.add_argument(
+        "--openrouter",
+        action="store_true",
+        help="模拟用户对话、主观评分和评估 AI 使用 OpenRouter；被测 AI 不受影响",
+    )
+    parser.add_argument(
+        "--openrouter-base-url",
+        default=os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
+        help="OpenRouter OpenAI 兼容 API Base URL",
+    )
+    parser.add_argument(
+        "--openrouter-api-key",
+        default=os.getenv("OPENROUTER_API_KEY", ""),
+        help="OpenRouter API Key",
+    )
+    parser.add_argument(
+        "--openrouter-model",
+        default=os.getenv("OPENROUTER_DEEPSEEK_MODEL", "deepseek/deepseek-v4-pro"),
+        help="OpenRouter 中的 DeepSeek 模型 ID",
+    )
+    parser.add_argument(
         "--aux-provider",
         choices=["official", "lab"],
         default=defaults.get("aux_provider", "official"),
@@ -185,6 +205,8 @@ def parse_args() -> argparse.Namespace:
         default_output_dir = f"{default_output_dir}-lab-hybrid"
     elif args.aux_provider == "lab" and not args.manual:
         default_output_dir = f"{default_output_dir}-lab"
+    elif args.provider_mode == "openrouter" and not args.manual:
+        default_output_dir = f"{default_output_dir}-openrouter"
     output_dir_text = args.output_dir or default_output_dir
     args.output_dir = resolve_output_dir(output_dir_text)
     args.success_jsonl = output_file_path(args.success_jsonl, paths["success_jsonl"], args.output_dir)
@@ -195,6 +217,16 @@ def parse_args() -> argparse.Namespace:
 
 def apply_provider_mode(args: argparse.Namespace) -> None:
     """Resolve role-specific providers while keeping --aux-provider backward compatible."""
+    if getattr(args, "openrouter", False):
+        if getattr(args, "lab", False) or args.aux_provider == "lab":
+            raise ValueError("--openrouter 不能与 --lab 或 --aux-provider lab 同时使用")
+        args.provider_mode = "openrouter"
+        args.simulated_user_provider = "openrouter"
+        args.subjective_rating_provider = "openrouter"
+        args.evaluator_provider = "" if args.manual else "openrouter"
+        args.simulated_user_model = args.openrouter_model
+        args.evaluator_model = args.openrouter_model
+        return
     if args.lab:
         args.provider_mode = "lab-hybrid"
         args.simulated_user_provider = "lab"
@@ -873,6 +905,16 @@ def role_credentials(args: argparse.Namespace) -> dict[str, dict[str, Any]]:
         credentials["subjective_rating"] = {
             **official_simulated_user,
         }
+    openrouter = {
+        "base_url": getattr(args, "openrouter_base_url", ""),
+        "api_key": getattr(args, "openrouter_api_key", ""),
+        "auto_append_v1": False,
+        "chat_completions_path": "/chat/completions",
+    }
+    if args.simulated_user_provider == "openrouter":
+        credentials["simulated_user"] = {**openrouter}
+    if args.subjective_rating_provider == "openrouter":
+        credentials["subjective_rating"] = {**openrouter}
     if not args.manual:
         credentials["tested_agent"] = {
             "base_url": args.tested_agent_base_url or args.base_url,
@@ -887,6 +929,8 @@ def role_credentials(args: argparse.Namespace) -> dict[str, dict[str, Any]]:
                 "auto_append_v1": True,
                 "chat_completions_path": "/chat/completions",
             }
+        elif args.evaluator_provider == "openrouter":
+            credentials["evaluator"] = {**openrouter}
     missing = [name for name, config in credentials.items() if not config["base_url"] or not config["api_key"]]
     if missing:
         raise ValueError(
