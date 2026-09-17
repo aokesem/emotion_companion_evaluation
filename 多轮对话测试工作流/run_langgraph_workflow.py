@@ -125,6 +125,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--turns", type=int, default=defaults["turns"], help="对话轮数；一轮为用户一句 + 被测 AI 一句")
     parser.add_argument("--simulated-user-model", type=str, default=defaults["simulated_user_model"], help="模拟用户模型名")
     parser.add_argument("--tested-profile", type=str, default=defaults.get("tested_profile", ""), help="被测模型 profile 名，读取 tested_model_profiles.json")
+    parser.add_argument(
+        "--tested-provider",
+        choices=["profile", "gpt", "gemini", "openrouter"],
+        default="profile",
+        help="被测模型来源；gpt/gemini/openrouter 模式下 --tested-profile 直接作为模型 ID",
+    )
     parser.add_argument("--tested-agent-model", type=str, default=None, help="被测 AI 模型名；可覆盖 tested-profile 中的模型名")
     parser.add_argument("--evaluator-model", type=str, default=defaults["evaluator_model"], help="评估 AI 模型名")
     parser.add_argument("--base-url", type=str, default=os.getenv("OPENAI_BASE_URL", ""), help="通用 API Base URL，未设置角色专用 URL 时使用")
@@ -152,7 +158,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--openrouter-model",
-        default=os.getenv("OPENROUTER_DEEPSEEK_MODEL", "deepseek/deepseek-v4-pro"),
+        default=os.getenv("OPENROUTER_DEEPSEEK_MODEL", "deepseek/deepseek-v4-flash-0731"),
         help="OpenRouter 中的 DeepSeek 模型 ID",
     )
     parser.add_argument(
@@ -205,8 +211,6 @@ def parse_args() -> argparse.Namespace:
         default_output_dir = f"{default_output_dir}-lab-hybrid"
     elif args.aux_provider == "lab" and not args.manual:
         default_output_dir = f"{default_output_dir}-lab"
-    elif args.provider_mode == "openrouter" and not args.manual:
-        default_output_dir = f"{default_output_dir}-openrouter"
     output_dir_text = args.output_dir or default_output_dir
     args.output_dir = resolve_output_dir(output_dir_text)
     args.success_jsonl = output_file_path(args.success_jsonl, paths["success_jsonl"], args.output_dir)
@@ -241,8 +245,30 @@ def apply_provider_mode(args: argparse.Namespace) -> None:
 
 def apply_tested_profile(args: argparse.Namespace, defaults: dict[str, Any]) -> None:
     args.profile_output_dir = ""
+    args.tested_agent_api_style = "openai"
     args.tested_agent_auto_append_v1 = True
     args.tested_agent_chat_completions_path = "/chat/completions"
+
+    if args.tested_provider != "profile":
+        if not args.tested_profile:
+            raise ValueError("使用 --tested-provider 时必须通过 --tested-profile 指定模型 ID")
+        args.tested_agent_model = args.tested_agent_model or args.tested_profile
+        args.profile_output_dir = args.tested_profile
+        if args.tested_provider == "gpt":
+            args.tested_agent_base_url = os.getenv("GPT_BASE_URL") or args.tested_agent_base_url or args.base_url
+            args.tested_agent_api_key = os.getenv("GPT_API_KEY") or args.tested_agent_api_key or args.api_key
+            args.tested_agent_api_style = "openai"
+            args.tested_agent_auto_append_v1 = False
+        elif args.tested_provider == "gemini":
+            args.tested_agent_base_url = os.getenv("GEMINI_BASE_URL", "https://api.aicodemirror.ai/api/gemini")
+            args.tested_agent_api_key = os.getenv("GEMINI_API_KEY", "")
+            args.tested_agent_api_style = "gemini"
+        else:
+            args.tested_agent_base_url = args.openrouter_base_url
+            args.tested_agent_api_key = args.openrouter_api_key
+            args.tested_agent_api_style = "openai"
+            args.tested_agent_auto_append_v1 = False
+        return
 
     if args.tested_profile:
         profiles = load_tested_profiles()
@@ -267,6 +293,11 @@ def apply_tested_profile(args: argparse.Namespace, defaults: dict[str, Any]) -> 
         if args.tested_agent_model is None:
             args.tested_agent_model = str(profile.get("model", "")).strip()
         args.profile_output_dir = str(profile.get("output_dir", args.tested_profile)).strip()
+        args.tested_agent_api_style = str(profile.get("api_style", "openai")).strip().lower()
+        if args.tested_agent_api_style not in {"openai", "gemini"}:
+            raise ValueError(
+                f"被测模型 profile 的 api_style 仅支持 openai/gemini: {args.tested_profile}"
+            )
         args.tested_agent_auto_append_v1 = bool(profile.get("auto_append_v1", True))
         args.tested_agent_chat_completions_path = str(profile.get("chat_completions_path", "/chat/completions")).strip()
     elif args.tested_agent_model is None:
@@ -390,6 +421,112 @@ class OpenAICompatClient:
                 if attempt < self.retries:
                     time.sleep(min(2**attempt, 8))
         raise RuntimeError(f"模型调用失败: {last_err}")
+
+
+class GeminiClient:
+    """Gemini native generateContent adapter implementing the shared chat interface."""
+
+    def __init__(self, base_url: str, api_key: str, timeout: int, retries: int, debug_http: bool = False):
+        self.base_url = base_url.rstrip("/")
+        self.api_key = api_key
+        self.timeout = timeout
+        self.retries = retries
+        self.debug_http = debug_http
+        self.session = requests.Session()
+
+    def chat_text(self, model: str, messages: list[dict[str, str]], temperature: float, max_tokens: int) -> str:
+        return self._chat(model, messages, temperature, max_tokens).strip()
+
+    def chat_json(
+        self,
+        model: str,
+        messages: list[dict[str, str]],
+        temperature: float,
+        max_tokens: int,
+    ) -> dict[str, Any]:
+        content = self._chat(model, messages, temperature, max_tokens)
+        try:
+            return parse_json_content(content)
+        except Exception as first_error:  # noqa: BLE001
+            repair_messages = [
+                {
+                    "role": "system",
+                    "content": "你是 JSON 修复器。请只输出一个合法 JSON 对象，不要输出 markdown，不要解释，不要增删字段含义。",
+                },
+                {
+                    "role": "user",
+                    "content": "下面内容本应是 JSON 对象，但格式可能有错误。请修复为合法 JSON 对象，保留原始语义：\n" + content,
+                },
+            ]
+            repaired = self._chat(model, repair_messages, min(temperature, 0.1), max_tokens)
+            try:
+                return parse_json_content(repaired)
+            except Exception as repair_error:  # noqa: BLE001
+                raise ValueError(
+                    "Gemini 返回 JSON 解析失败，且自动修复失败。"
+                    f"首次错误: {first_error}; 修复错误: {repair_error}"
+                ) from repair_error
+
+    @staticmethod
+    def build_payload(
+        messages: list[dict[str, str]], temperature: float, max_tokens: int
+    ) -> dict[str, Any]:
+        system_parts: list[dict[str, str]] = []
+        contents: list[dict[str, Any]] = []
+        for message in messages:
+            role = str(message.get("role", "")).strip().lower()
+            text = str(message.get("content", ""))
+            if role == "system":
+                system_parts.append({"text": text})
+                continue
+            gemini_role = "model" if role == "assistant" else "user"
+            if contents and contents[-1]["role"] == gemini_role:
+                contents[-1]["parts"].append({"text": text})
+            else:
+                contents.append({"role": gemini_role, "parts": [{"text": text}]})
+        payload: dict[str, Any] = {
+            "contents": contents,
+            "generationConfig": {
+                "temperature": temperature,
+                "maxOutputTokens": max_tokens,
+            },
+        }
+        if system_parts:
+            payload["systemInstruction"] = {"parts": system_parts}
+        return payload
+
+    @staticmethod
+    def extract_text(data: dict[str, Any]) -> str:
+        candidates = data.get("candidates")
+        if not isinstance(candidates, list) or not candidates:
+            feedback = data.get("promptFeedback", {})
+            raise ValueError(f"Gemini 响应缺少 candidates: {feedback}")
+        parts = candidates[0].get("content", {}).get("parts", [])
+        texts = [str(part.get("text", "")) for part in parts if isinstance(part, dict) and not part.get("thought")]
+        content = "".join(texts).strip()
+        if not content:
+            raise ValueError(f"Gemini 响应中没有文本内容: {data}")
+        return content
+
+    def _chat(self, model: str, messages: list[dict[str, str]], temperature: float, max_tokens: int) -> str:
+        url = f"{self.base_url}/v1beta/models/{model}:generateContent"
+        payload = self.build_payload(messages, temperature, max_tokens)
+        headers = {"x-goog-api-key": self.api_key, "Content-Type": "application/json"}
+        last_err: Exception | None = None
+        for attempt in range(1, self.retries + 1):
+            try:
+                resp = self.session.post(url, headers=headers, json=payload, timeout=self.timeout)
+                if self.debug_http:
+                    print(f"[GEMINI HTTP] POST {url}")
+                    print(f"[GEMINI HTTP] status={resp.status_code} body[:500]={resp.text[:500]}")
+                if resp.status_code >= 400:
+                    raise RuntimeError(f"HTTP {resp.status_code}: {resp.text[:500]}")
+                return self.extract_text(resp.json())
+            except Exception as exc:  # noqa: BLE001
+                last_err = exc
+                if attempt < self.retries:
+                    time.sleep(min(2**attempt, 8))
+        raise RuntimeError(f"Gemini 模型调用失败: {last_err}")
 
 
 class ChatClient(Protocol):
@@ -661,6 +798,7 @@ def success_result(state: WorkflowState, args: argparse.Namespace) -> dict[str, 
             "subjective_rating_provider": args.subjective_rating_provider,
             "evaluator_provider": args.evaluator_provider,
             "tested_profile": args.tested_profile if not args.manual else "",
+            "tested_provider": getattr(args, "tested_provider", "profile"),
             "simulated_user_model": args.simulated_user_model,
             "tested_agent_model": "manual" if args.manual else args.tested_agent_model,
             "evaluator_model": "" if args.manual else args.evaluator_model,
@@ -919,6 +1057,7 @@ def role_credentials(args: argparse.Namespace) -> dict[str, dict[str, Any]]:
         credentials["tested_agent"] = {
             "base_url": args.tested_agent_base_url or args.base_url,
             "api_key": args.tested_agent_api_key or args.api_key,
+            "api_style": getattr(args, "tested_agent_api_style", "openai"),
             "auto_append_v1": args.tested_agent_auto_append_v1,
             "chat_completions_path": args.tested_agent_chat_completions_path,
         }
@@ -960,18 +1099,17 @@ def role_credentials(args: argparse.Namespace) -> dict[str, dict[str, Any]]:
 
 def create_clients(args: argparse.Namespace) -> dict[str, ChatClient]:
     credentials = role_credentials(args)
-    clients: dict[str, ChatClient] = {
-        name: OpenAICompatClient(
-            config["base_url"],
-            config["api_key"],
-            args.timeout,
-            args.retries,
-            args.debug_http,
-            config["auto_append_v1"],
-            config["chat_completions_path"],
-        )
-        for name, config in credentials.items()
-    }
+    clients: dict[str, ChatClient] = {}
+    for name, config in credentials.items():
+        if config.get("api_style", "openai") == "gemini":
+            clients[name] = GeminiClient(
+                config["base_url"], config["api_key"], args.timeout, args.retries, args.debug_http
+            )
+        else:
+            clients[name] = OpenAICompatClient(
+                config["base_url"], config["api_key"], args.timeout, args.retries,
+                args.debug_http, config["auto_append_v1"], config["chat_completions_path"]
+            )
     if args.simulated_user_provider == "lab":
         clients["simulated_user"] = LabAgentClient(
             args.lab_api_url,

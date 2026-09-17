@@ -1,0 +1,6 @@
+{"ID": "57457126001", "sample_pick_order": 1, "error": "模型返回 JSON 解析失败，且自动修复失败。首次错误: 模型返回非 JSON 对象: None; 修复错误: 模型返回非 JSON 对象: null; 原始输出片段: None; 修复输出片段: null", "created_at": "2026-09-09T10:29:09"}
+{"ID": "75376243001", "sample_pick_order": 2, "error": "模型返回 JSON 解析失败，且自动修复失败。首次错误: 模型返回非 JSON 对象: None; 修复错误: 模型返回非 JSON 对象: null; 原始输出片段: None; 修复输出片段: null", "created_at": "2026-09-09T10:31:51"}
+{"ID": "324078110002", "sample_pick_order": 3, "error": "模型返回 JSON 解析失败，且自动修复失败。首次错误: 模型返回非 JSON 对象: None; 修复错误: 模型返回非 JSON 对象: null; 原始输出片段: None; 修复输出片段: null", "created_at": "2026-09-09T10:34:42"}
+{"ID": "281104130001", "sample_pick_order": 13, "error": "模型返回 JSON 解析失败，且自动修复失败。首次错误: 模型返回非 JSON 对象: None; 修复错误: 模型返回非 JSON 对象: null; 原始输出片段: None; 修复输出片段: null", "created_at": "2026-09-09T11:30:06"}
+{"ID": "154044202001", "sample_pick_order": 22, "error": "模型返回 JSON 解析失败，且自动修复失败。首次错误: 模型返回非 JSON 对象: None; 修复错误: 模型返回非 JSON 对象: null; 原始输出片段: None; 修复输出片段: null", "created_at": "2026-09-09T12:07:07"}
+{"ID": "135559225002", "sample_pick_order": 25, "error": "模型返回 JSON 解析失败，且自动修复失败。首次错误: 模型返回非 JSON 对象: None; 修复错误: 模型返回非 JSON 对象: null; 原始输出片段: None; 修复输出片段: null", "created_at": "2026-09-09T12:22:43"}

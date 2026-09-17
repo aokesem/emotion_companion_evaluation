@@ -118,5 +118,13 @@
     "output_dir": "qwen3.7-flash-2026-07-15",
     "auto_append_v1": false,
     "chat_completions_path": "/chat/completions"
+  },
+  "qwen-flash": {
+    "base_url": "https://llm-zodcqel1zk6wtxia.cn-beijing.maas.aliyuncs.com/compatible-mode/v1",
+    "api_key_env": "Qwen_Key",
+    "model": "qwen-flash",
+    "output_dir": "qwen-flash",
+    "auto_append_v1": false,
+    "chat_completions_path": "/chat/completions"
   }
 }

@@ -121,6 +121,61 @@ python .\多轮对话测试工作流\run_langgraph_workflow.py --start 0 --limit
 python .\多轮对话测试工作流\run_langgraph_workflow.py --ids 14643113001 --turns 10 --continue-on-error
 ```
 
+### Gemini 被测模型（中转站原生接口）
+
+项目支持通过 profile 的 `api_style: "gemini"` 调用 Gemini 原生 `generateContent` 接口。中转站 Base URL 使用 `https://api.aicodemirror.ai/api/gemini`，Key 使用 `GEMINI_API_KEY`。已提供 profile `gemini-3.6-flash-mirror`；如中转站要求的模型 ID 不同，只需复制 profile 并修改 `model`。
+
+```env
+GEMINI_API_KEY=你的Gemini中转站密钥
+```
+
+先做一个样本测试：
+
+```powershell
+python .\多轮对话测试工作流\run_langgraph_workflow.py `
+  --tested-profile gemini-3.6-flash-mirror `
+  --output-dir gemini-3.6-flash-mirror-smoke `
+  --limit 1 `
+  --continue-on-error
+```
+
+该适配器发送 Gemini 原生的 `systemInstruction`、`contents` 和 `generationConfig` 字段。如果中转站并非原生 Gemini REST 兼容接口，而是另一种路径或响应格式，首次测试会在错误日志中显示具体 HTTP 响应，再据此调整适配器。
+
+### GPT/Gemini 直接指定模型 ID
+
+GPT 和 Gemini 也可以不写入 `tested_model_profiles.json`，每次运行时通过 `--tested-provider` 区分接口，并将 `--tested-profile` 直接作为模型 ID：
+
+```env
+GPT_BASE_URL=https://api.aicodemirror.ai/api/codex/backend-api/codex/v1
+GPT_API_KEY=你的GPT中转站密钥
+GEMINI_BASE_URL=https://api.aicodemirror.ai/api/gemini
+GEMINI_API_KEY=你的Gemini中转站密钥
+```
+
+GPT 示例：
+
+```powershell
+python .\run_langgraph_workflow.py `
+  --tested-provider gpt `
+  --tested-profile gpt-5.2 `
+  --output-dir gpt-5.2 `
+  --limit 1 `
+  --continue-on-error
+```
+
+Gemini 示例：
+
+```powershell
+python .\run_langgraph_workflow.py `
+  --tested-provider gemini `
+  --tested-profile gemini-3.6-flash `
+  --output-dir gemini-3.6-flash `
+  --limit 1 `
+  --continue-on-error
+```
+
+此模式下默认输出目录就是模型 ID；如果模型 ID 含有 `/`（例如 OpenRouter 模型 ID），建议显式指定 Windows 目录名。
+
 脚本会读取本目录下 `.env`，如果不存在，则继续尝试读取 `../数据生成代码/.env`。
 
 ## 模拟用户与评估 AI 的双 API 模式
@@ -138,7 +193,7 @@ python .\多轮对话测试工作流\run_langgraph_workflow.py --aux-provider of
 ```env
 OPENROUTER_API_KEY=你的OpenRouter密钥
 OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
-OPENROUTER_DEEPSEEK_MODEL=deepseek/deepseek-v4-pro
+OPENROUTER_DEEPSEEK_MODEL=deepseek/deepseek-v4-flash-0731
 ```
 
 其中 `OPENROUTER_DEEPSEEK_MODEL` 必须填写 OpenRouter 模型页面显示的实际模型 ID。如果该平台上的 V4 Pro ID 不同，只修改此项即可。
@@ -154,7 +209,7 @@ python .\多轮对话测试工作流\run_langgraph_workflow.py `
   --continue-on-error
 ```
 
-未指定 `--output-dir` 时，结果自动写入被测模型目录名加 `-openrouter` 后缀，避免混入 Official 数据。切回原 Official API 时去掉 `--openrouter` 即可；也可以显式传入 `--aux-provider official`。
+未指定 `--output-dir` 时，结果写入与普通模式相同的被测模型目录。请注意，OpenRouter 结果会与该目录中的其他记录一起保存；如需隔离实验数据，请显式传入 `--output-dir`。切回原 Official API 时去掉 `--openrouter` 即可；也可以显式传入 `--aux-provider official`。
 
 `lab` 模式只将模拟用户 AI 和评估 AI 切换到实验室工作流 API，被测 AI 不变。在 `.env` 中配置：
 

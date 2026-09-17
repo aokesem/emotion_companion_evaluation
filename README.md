@@ -30,7 +30,9 @@ python .\多轮对话测试工作流\run_langgraph_workflow.py --tested-profile 
 
 --lab 将用户AI改为清华ithink平台api 
 
---openrouter 将用户AI和评估AI的来源改为openrouter
+--openrouter 将用户AI和评估AI的来源改为openrouter(模型在.env.openrouter.example中指定)
+
+--tested-provider 接入gpt或gemini作为被测模型（来自中转站），需要手动输入 --tested-profile 指定模型
 
 --output-dir 指定输出目录
 

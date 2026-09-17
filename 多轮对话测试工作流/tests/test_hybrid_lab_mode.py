@@ -12,6 +12,22 @@ import run_langgraph_workflow as workflow  # noqa: E402
 
 
 class HybridLabModeTests(unittest.TestCase):
+    def test_raw_gpt_provider_uses_model_id_without_profile_lookup(self):
+        args = argparse.Namespace(
+            tested_provider="gpt",
+            tested_profile="gpt-5.2",
+            tested_agent_model=None,
+            tested_agent_base_url="",
+            tested_agent_api_key="",
+            base_url="https://api.aicodemirror.ai/api/codex/backend-api/codex/v1",
+            api_key="mirror-key",
+        )
+        workflow.apply_tested_profile(args, {"tested_agent_model": "ignored"})
+        self.assertEqual(args.tested_agent_model, "gpt-5.2")
+        self.assertEqual(args.profile_output_dir, "gpt-5.2")
+        self.assertEqual(args.tested_agent_api_style, "openai")
+        self.assertFalse(args.tested_agent_auto_append_v1)
+
     def test_openrouter_flag_resolves_all_auxiliary_roles(self):
         args = argparse.Namespace(
             openrouter=True,
